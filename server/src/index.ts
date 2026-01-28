@@ -25,7 +25,8 @@ const allowedOrigins = [
   'https://keplertaptrack.vercel.app',
   'http://localhost:5173',
   'http://localhost:3000',
-  'http://localhost:5174'
+  'http://localhost:5174',
+  'http://localhost:8080'
 ];
 
 // Support comma-separated list of frontends via FRONTEND_URLS or single FRONTEND_URL
@@ -59,13 +60,14 @@ function isAllowedOrigin(origin: string): boolean {
 
 const corsOptions = {
   origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    console.log(`🔍 CORS request from origin: ${origin || 'undefined'}`);
+    
     if (isAllowedOrigin(origin || '')) {
+      console.log(`✅ Allowing origin: ${origin}`);
       callback(null, true);
     } else {
-      if (origin) {
-        console.log(`⚠️ Blocked CORS request from origin: ${origin}`);
-      }
-      console.log(`✅ Allowed origins: ${allowedOrigins.join(', ')}`);
+      console.log(`⚠️ Blocked CORS request from origin: ${origin}`);
+      console.log(`📋 Allowed origins: ${allowedOrigins.join(', ')}`);
       callback(null, false);
     }
   },
@@ -89,6 +91,26 @@ const corsOptions = {
 
 // Middleware - Apply CORS before any routes
 app.use(cors(corsOptions));
+
+// Additional CORS middleware for extra safety
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (isAllowedOrigin(origin || '')) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS,HEAD');
+  res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Accept,Origin,Accept-Language,Cache-Control,Pragma');
+  res.header('Access-Control-Expose-Headers', 'Content-Range,X-Content-Range');
+  res.header('Access-Control-Max-Age', '86400');
+  
+  if (req.method === 'OPTIONS') {
+    res.status(204).send();
+    return;
+  }
+  
+  next();
+});
 
 // Explicitly handle all OPTIONS requests for preflight
 app.options('*', cors(corsOptions));
