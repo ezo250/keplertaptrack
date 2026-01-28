@@ -28,34 +28,58 @@ const allowedOrigins = [
   'http://localhost:5174'
 ];
 
-if (process.env.FRONTEND_URL) {
-  allowedOrigins.push(process.env.FRONTEND_URL);
+// Support comma-separated list of frontends via FRONTEND_URLS or single FRONTEND_URL
+const envOrigins = (process.env.FRONTEND_URLS || process.env.FRONTEND_URL || '')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
+allowedOrigins.push(...envOrigins);
+
+// Helper to allow dynamic patterns (e.g., Vercel preview URLs and any localhost)
+function isAllowedOrigin(origin: string): boolean {
+  if (!origin) return true; // allow non-browser clients
+  try {
+    const url = new URL(origin);
+    const hostname = url.hostname;
+
+    if (allowedOrigins.includes(origin)) return true;
+
+    // Allow any Vercel subdomain (useful for preview deployments)
+    if (hostname.endsWith('.vercel.app')) return true;
+
+    // Allow localhost and 127.0.0.1 on any port
+    if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
+
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 const corsOptions = {
   origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
-    // Allow requests with no origin (mobile apps, Postman, etc.)
-    if (!origin) {
-      return callback(null, true);
-    }
-    
-    // Check if origin is in allowed list
-    if (allowedOrigins.includes(origin)) {
+    if (isAllowedOrigin(origin || '')) {
       callback(null, true);
     } else {
-      console.log(`⚠️ Blocked CORS request from origin: ${origin}`);
+      if (origin) {
+        console.log(`⚠️ Blocked CORS request from origin: ${origin}`);
+      }
       console.log(`✅ Allowed origins: ${allowedOrigins.join(', ')}`);
       callback(null, false);
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],
   allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
-    'X-Requested-With', 
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
     'Accept',
-    'Origin'
+    'Origin',
+    'Accept-Language',
+    'Cache-Control',
+    'Pragma'
   ],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
   optionsSuccessStatus: 204,
