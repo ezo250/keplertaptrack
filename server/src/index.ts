@@ -87,24 +87,21 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
-// Database connection check and server start
-async function startServer() {
-  try {
-    // Test database connection
-    await prisma.$connect();
-    console.log('✅ Database connected successfully');
-
-    // Start server
-    app.listen(PORT, HOST, () => {
-      console.log(`🚀 Kepler TapTrack API server running on ${HOST}:${PORT}`);
-      console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`🌐 CORS enabled for: https://keplertaptrack.vercel.app`);
+// Start server immediately without waiting for database
+app.listen(PORT, HOST, () => {
+  console.log(`🚀 Kepler TapTrack API server running on ${HOST}:${PORT}`);
+  console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🌐 CORS enabled for: https://keplertaptrack.vercel.app`);
+  
+  // Test database connection after server starts
+  prisma.$connect()
+    .then(() => {
+      console.log('✅ Database connected successfully');
+    })
+    .catch((error) => {
+      console.error('❌ Database connection failed:', error);
     });
-  } catch (error) {
-    console.error('❌ Failed to start server:', error);
-    process.exit(1);
-  }
-}
+});
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
@@ -130,7 +127,6 @@ process.on('unhandledRejection', (reason, promise) => {
   process.exit(1);
 });
 
-// Start the server
-startServer();
+
 
 export { prisma };
