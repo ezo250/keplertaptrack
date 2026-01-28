@@ -1,0 +1,39 @@
+# Render Blueprint for Kepler TapTrack
+# This file defines the infrastructure for automatic deployment
+
+services:
+  # Backend API Service
+  - type: web
+    name: kepler-taptrack-api
+    runtime: node
+    region: oregon
+    plan: free
+    branch: master
+    rootDir: server
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        sync: false # Set this manually in Render Dashboard
+      - key: PORT
+        value: 3001
+      - key: NODE_ENV
+        value: production
+    healthCheckPath: /api
+
+  # Frontend Static Site
+  - type: web
+    name: kepler-taptrack-frontend
+    runtime: static
+    region: oregon
+    plan: free
+    branch: master
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://kepler-taptrack-api.onrender.com/api
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
