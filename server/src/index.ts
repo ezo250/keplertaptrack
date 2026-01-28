@@ -33,19 +33,40 @@ if (process.env.FRONTEND_URL) {
 }
 
 const corsOptions = {
-  origin: allowedOrigins,
+  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) {
+      return callback(null, true);
+    }
+    
+    // Check if origin is in allowed list
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log(`⚠️ Blocked CORS request from origin: ${origin}`);
+      console.log(`✅ Allowed origins: ${allowedOrigins.join(', ')}`);
+      callback(null, false);
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With', 
+    'Accept',
+    'Origin'
+  ],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  optionsSuccessStatus: 200,
-  preflightContinue: false
+  optionsSuccessStatus: 204,
+  preflightContinue: false,
+  maxAge: 86400 // 24 hours
 };
 
-// Middleware
+// Middleware - Apply CORS before any routes
 app.use(cors(corsOptions));
 
-// Handle preflight requests explicitly
+// Explicitly handle all OPTIONS requests for preflight
 app.options('*', cors(corsOptions));
 
 app.use(express.json());
