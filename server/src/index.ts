@@ -27,7 +27,7 @@ console.log(`🔧 Frontend URL: ${process.env.FRONTEND_URL || 'Not set'}`);
 console.log(`🔧 Frontend URLs: ${process.env.FRONTEND_URLS || 'Not set'}`);
 
 // Bind to all interfaces for Render deployment
-const HOST = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost';
+const HOST = '0.0.0.0';
 
 // CORS configuration - Allow requests from Vercel and localhost
 const allowedOrigins = [
