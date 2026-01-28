@@ -99,22 +99,24 @@ export default function Login() {
           </motion.p>
           
           <motion.div 
-            className="mt-12 flex items-center gap-4"
+            className="mt-12"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6 }}
           >
-            <div className="flex -space-x-3">
-              {[1, 2, 3].map((i) => (
-                <div 
-                  key={i} 
-                  className="w-10 h-10 rounded-full bg-white/20 border-2 border-white/40 flex items-center justify-center text-sm font-medium"
-                >
-                  {['JM', 'MC', 'EN'][i-1]}
-                </div>
-              ))}
+            <div className="flex items-center gap-3">
+              <div className="flex -space-x-3">
+                {[1, 2, 3].map((i) => (
+                  <div 
+                    key={i} 
+                    className="w-10 h-10 rounded-full bg-white/20 border-2 border-white/40 flex items-center justify-center text-sm font-medium"
+                  >
+                    {['JM', 'MC', 'EN'][i-1]}
+                  </div>
+                ))}
+              </div>
+              <span className="text-white/70">Trusted by teachers at Kepler College</span>
             </div>
-            <span className="text-white/70">30+ teachers actively using the system</span>
           </motion.div>
         </div>
         

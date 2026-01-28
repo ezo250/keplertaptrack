@@ -25,6 +25,10 @@ app.use('/api/history', historyRoutes);
 app.use('/api/notifications', notificationRoutes);
 
 // Health check
+app.get('/api', (req, res) => {
+  res.json({ status: 'OK', message: 'Kepler TapTrack API is running' });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Kepler TapTrack API is running' });
 });
