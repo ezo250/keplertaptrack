@@ -40,13 +40,24 @@ function AppRoutes() {
 
   // Redirect to main URL on page reload
   useEffect(() => {
-    // Check if this is a page reload (not initial load)
-    const isReload = window.performance.navigation.type === 1 || 
-                     window.performance.getEntriesByType('navigation')[0]?.type === 'reload';
+    // Multiple methods to detect page reload (works on all devices including mobile)
+    const isReload = 
+      window.performance.navigation.type === 1 || 
+      window.performance.getEntriesByType('navigation')[0]?.type === 'reload' ||
+      sessionStorage.getItem('isReload') === 'true';
+    
+    // Set reload flag for next check
+    sessionStorage.setItem('isReload', 'true');
     
     if (isReload && window.location.hostname !== 'localhost') {
       window.location.replace('https://keplertaptrack.vercel.app');
     }
+    
+    // Clear flag on page unload
+    const handleUnload = () => sessionStorage.removeItem('isReload');
+    window.addEventListener('beforeunload', handleUnload);
+    
+    return () => window.removeEventListener('beforeunload', handleUnload);
   }, []);
 
   return (
