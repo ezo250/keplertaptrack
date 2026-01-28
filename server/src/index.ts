@@ -9,8 +9,16 @@ import historyRoutes from './routes/history';
 import notificationRoutes from './routes/notifications';
 
 const app = express();
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  log: ['error', 'warn'],
+});
 const PORT = process.env.PORT || 3001;
+
+// Verify environment variables
+if (!process.env.DATABASE_URL) {
+  console.error('❌ DATABASE_URL environment variable is not set');
+  process.exit(1);
+}
 
 // CORS configuration - Allow requests from Vercel and localhost
 const allowedOrigins = [
@@ -50,13 +58,32 @@ app.use('/api/timetable', timetableRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/notifications', notificationRoutes);
 
-// Health check
+// Health check routes
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    message: 'Kepler TapTrack API is running',
+    version: '1.0.0',
+    timestamp: new Date().toISOString()
+  });
+});
+
 app.get('/api', (req, res) => {
-  res.json({ status: 'OK', message: 'Kepler TapTrack API is running' });
+  res.json({ 
+    status: 'OK', 
+    message: 'Kepler TapTrack API is running',
+    version: '1.0.0',
+    timestamp: new Date().toISOString()
+  });
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Kepler TapTrack API is running' });
+  res.json({ 
+    status: 'OK', 
+    message: 'Kepler TapTrack API is running',
+    version: '1.0.0',
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Error handling
@@ -65,15 +92,50 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Kepler TapTrack API server running on http://localhost:${PORT}`);
-});
+// Database connection check and server start
+async function startServer() {
+  try {
+    // Test database connection
+    await prisma.$connect();
+    console.log('✅ Database connected successfully');
+
+    // Start server
+    app.listen(PORT, () => {
+      console.log(`🚀 Kepler TapTrack API server running on port ${PORT}`);
+      console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`🌐 Allowed origins: ${allowedOrigins.join(', ')}`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+}
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
+  console.log('Shutting down gracefully...');
   await prisma.$disconnect();
   process.exit(0);
 });
+
+process.on('SIGTERM', async () => {
+  console.log('Shutting down gracefully...');
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+// Handle uncaught errors
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
+// Start the server
+startServer();
 
 export { prisma };

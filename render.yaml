@@ -10,18 +10,18 @@ services:
     plan: free
     branch: master
     rootDir: server
-    buildCommand: npm install && npx prisma generate && npm run build
+    buildCommand: npm ci && npx prisma generate && npm run build
     startCommand: npm start
     envVars:
       - key: DATABASE_URL
         sync: false # Set this manually in Render Dashboard
       - key: PORT
-        value: 3001
+        value: 10000
       - key: NODE_ENV
         value: production
       - key: FRONTEND_URL
         value: https://keplertaptrack.vercel.app
-    healthCheckPath: /api
+    healthCheckPath: /api/health
 
   # Frontend Static Site
   - type: web
