@@ -16,6 +16,7 @@ import TeacherDashboard from "@/pages/teacher/TeacherDashboard";
 import TeacherDevices from "@/pages/teacher/TeacherDevices";
 import TeacherSchedule from "@/pages/teacher/TeacherSchedule";
 import NotFound from "@/pages/NotFound";
+import { useEffect } from "react";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +37,24 @@ function ProtectedRoute({ children, allowedRole }: { children: React.ReactNode; 
 
 function AppRoutes() {
   const { isAuthenticated, user } = useAuth();
+
+  // Redirect to main URL on refresh
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // This will trigger on page refresh
+      if (window.location.hostname !== 'keplertaptrack.vercel.app') {
+        window.location.href = 'https://keplertaptrack.vercel.app';
+      }
+    };
+
+    // Also check on component mount (page load)
+    if (window.location.hostname !== 'keplertaptrack.vercel.app' && window.location.hostname !== 'localhost') {
+      window.location.href = 'https://keplertaptrack.vercel.app';
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
 
   return (
     <Routes>
