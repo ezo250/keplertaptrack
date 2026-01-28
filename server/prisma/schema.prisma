@@ -4,12 +4,12 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
 }
 
 model User {
-  id         String   @id @default(uuid())
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
   name       String
   email      String   @unique
   password   String
@@ -26,10 +26,10 @@ model User {
 }
 
 model Device {
-  id               String    @id @default(uuid())
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
   deviceId         String    @unique
   status           String    // 'available', 'in_use', 'overdue'
-  currentUserId    String?
+  currentUserId    String?   @db.ObjectId
   currentUserName  String?
   pickedUpAt       DateTime?
   expectedReturnAt DateTime?
@@ -44,7 +44,7 @@ model Device {
 }
 
 model TimetableEntry {
-  id          String   @id @default(uuid())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   teacherId   String
   teacherName String
   course      String
@@ -57,8 +57,8 @@ model TimetableEntry {
 }
 
 model Notification {
-  id        String   @id @default(uuid())
-  userId    String
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
   type      String   // 'reminder', 'overdue', 'success', 'info'
   title     String
   message   String
@@ -70,9 +70,9 @@ model Notification {
 }
 
 model DeviceHistory {
-  id        String   @id @default(uuid())
-  deviceId  String
-  userId    String
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  deviceId  String   @db.ObjectId
+  userId    String   @db.ObjectId
   userName  String
   action    String   // 'pickup' or 'return'
   timestamp DateTime @default(now())
