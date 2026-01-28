@@ -12,7 +12,7 @@ const app = express();
 const prisma = new PrismaClient({
   log: ['error', 'warn'],
 });
-const PORT = process.env.PORT || 3001;
+const PORT = parseInt(process.env.PORT || '3001', 10);
 
 // Verify environment variables
 if (!process.env.DATABASE_URL) {
