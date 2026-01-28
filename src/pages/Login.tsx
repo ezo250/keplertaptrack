@@ -31,7 +31,7 @@ export default function Login() {
     if (success) {
       navigate(selectedRole === 'super_admin' ? '/admin' : '/teacher');
     } else {
-      setError('Invalid credentials. Try admin@kepler.edu/admin123 or teacher@kepler.edu/teacher123');
+      setError('Invalid credentials. Please check your email and password.');
     }
     
     setIsLoading(false);
@@ -254,10 +254,6 @@ export default function Login() {
                     'Sign In'
                   )}
                 </Button>
-                
-                <p className="text-center text-sm text-muted-foreground">
-                  Demo credentials: {selectedRole === 'super_admin' ? 'admin@kepler.edu / admin123' : 'teacher@kepler.edu / teacher123'}
-                </p>
               </motion.form>
             )}
           </AnimatePresence>
