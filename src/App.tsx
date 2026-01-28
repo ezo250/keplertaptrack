@@ -38,22 +38,15 @@ function ProtectedRoute({ children, allowedRole }: { children: React.ReactNode; 
 function AppRoutes() {
   const { isAuthenticated, user } = useAuth();
 
-  // Redirect to main URL on refresh
+  // Redirect to main URL on page reload
   useEffect(() => {
-    const handleBeforeUnload = () => {
-      // This will trigger on page refresh
-      if (window.location.hostname !== 'keplertaptrack.vercel.app') {
-        window.location.href = 'https://keplertaptrack.vercel.app';
-      }
-    };
-
-    // Also check on component mount (page load)
-    if (window.location.hostname !== 'keplertaptrack.vercel.app' && window.location.hostname !== 'localhost') {
-      window.location.href = 'https://keplertaptrack.vercel.app';
+    // Check if this is a page reload (not initial load)
+    const isReload = window.performance.navigation.type === 1 || 
+                     window.performance.getEntriesByType('navigation')[0]?.type === 'reload';
+    
+    if (isReload && window.location.hostname !== 'localhost') {
+      window.location.replace('https://keplertaptrack.vercel.app');
     }
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
   return (
