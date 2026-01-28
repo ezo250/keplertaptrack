@@ -29,100 +29,15 @@ console.log(`🔧 Frontend URLs: ${process.env.FRONTEND_URLS || 'Not set'}`);
 // Bind to all interfaces for Render deployment
 const HOST = '0.0.0.0';
 
-// CORS configuration - Allow requests from Vercel and localhost
-const allowedOrigins = [
-  'https://keplertaptrack.vercel.app',
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'http://localhost:5174',
-  'http://localhost:8080'
-];
+// CORS configuration - Simple and direct for production
+app.use(cors({
+  origin: "https://keplertaptrack.vercel.app",
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true
+}));
 
-// Support comma-separated list of frontends via FRONTEND_URLS or single FRONTEND_URL
-const envOrigins = (process.env.FRONTEND_URLS || process.env.FRONTEND_URL || '')
-  .split(',')
-  .map(o => o.trim())
-  .filter(Boolean);
-
-allowedOrigins.push(...envOrigins);
-
-// Helper to allow dynamic patterns (e.g., Vercel preview URLs and any localhost)
-function isAllowedOrigin(origin: string): boolean {
-  if (!origin) return true; // allow non-browser clients
-  try {
-    const url = new URL(origin);
-    const hostname = url.hostname;
-
-    if (allowedOrigins.includes(origin)) return true;
-
-    // Allow any Vercel subdomain (useful for preview deployments)
-    if (hostname.endsWith('.vercel.app')) return true;
-
-    // Allow localhost and 127.0.0.1 on any port
-    if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
-
-    return false;
-  } catch {
-    return false;
-  }
-}
-
-const corsOptions = {
-  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
-    console.log(`🔍 CORS request from origin: ${origin || 'undefined'}`);
-    
-    if (isAllowedOrigin(origin || '')) {
-      console.log(`✅ Allowing origin: ${origin}`);
-      callback(null, true);
-    } else {
-      console.log(`⚠️ Blocked CORS request from origin: ${origin}`);
-      console.log(`📋 Allowed origins: ${allowedOrigins.join(', ')}`);
-      callback(null, false);
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'],
-  allowedHeaders: [
-    'Content-Type',
-    'Authorization',
-    'X-Requested-With',
-    'Accept',
-    'Origin',
-    'Accept-Language',
-    'Cache-Control',
-    'Pragma'
-  ],
-  exposedHeaders: ['Content-Range', 'X-Content-Range'],
-  optionsSuccessStatus: 204,
-  preflightContinue: false,
-  maxAge: 86400 // 24 hours
-};
-
-// Middleware - Apply CORS before any routes
-app.use(cors(corsOptions));
-
-// Additional CORS middleware for extra safety
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (isAllowedOrigin(origin || '')) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS,HEAD');
-  res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Accept,Origin,Accept-Language,Cache-Control,Pragma');
-  res.header('Access-Control-Expose-Headers', 'Content-Range,X-Content-Range');
-  res.header('Access-Control-Max-Age', '86400');
-  
-  if (req.method === 'OPTIONS') {
-    res.status(204).send();
-    return;
-  }
-  
-  next();
-});
-
-// Explicitly handle all OPTIONS requests for preflight
-app.options('*', cors(corsOptions));
+app.options("*", cors());
 
 app.use(express.json());
 
@@ -179,7 +94,7 @@ async function startServer() {
     app.listen(PORT, HOST, () => {
       console.log(`🚀 Kepler TapTrack API server running on ${HOST}:${PORT}`);
       console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`🌐 Allowed origins: ${allowedOrigins.join(', ')}`);
+      console.log(`🌐 CORS enabled for: https://keplertaptrack.vercel.app`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
