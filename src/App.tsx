@@ -16,7 +16,6 @@ import TeacherDashboard from "@/pages/teacher/TeacherDashboard";
 import TeacherDevices from "@/pages/teacher/TeacherDevices";
 import TeacherSchedule from "@/pages/teacher/TeacherSchedule";
 import NotFound from "@/pages/NotFound";
-import { useEffect } from "react";
 
 const queryClient = new QueryClient();
 
@@ -37,28 +36,6 @@ function ProtectedRoute({ children, allowedRole }: { children: React.ReactNode; 
 
 function AppRoutes() {
   const { isAuthenticated, user } = useAuth();
-
-  // Redirect to main URL on page reload
-  useEffect(() => {
-    // Multiple methods to detect page reload (works on all devices including mobile)
-    const isReload = 
-      window.performance.navigation.type === 1 || 
-      window.performance.getEntriesByType('navigation')[0]?.type === 'reload' ||
-      sessionStorage.getItem('isReload') === 'true';
-    
-    // Set reload flag for next check
-    sessionStorage.setItem('isReload', 'true');
-    
-    if (isReload && window.location.hostname !== 'localhost') {
-      window.location.replace('https://keplertaptrack.vercel.app');
-    }
-    
-    // Clear flag on page unload
-    const handleUnload = () => sessionStorage.removeItem('isReload');
-    window.addEventListener('beforeunload', handleUnload);
-    
-    return () => window.removeEventListener('beforeunload', handleUnload);
-  }, []);
 
   return (
     <Routes>
