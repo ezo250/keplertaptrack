@@ -20,6 +20,15 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
+console.log(`🔧 Starting server on port: ${PORT}`);
+console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+console.log(`🔧 Database URL configured: ${process.env.DATABASE_URL ? 'Yes' : 'No'}`);
+console.log(`🔧 Frontend URL: ${process.env.FRONTEND_URL || 'Not set'}`);
+console.log(`🔧 Frontend URLs: ${process.env.FRONTEND_URLS || 'Not set'}`);
+
+// Bind to all interfaces for Render deployment
+const HOST = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost';
+
 // CORS configuration - Allow requests from Vercel and localhost
 const allowedOrigins = [
   'https://keplertaptrack.vercel.app',
@@ -167,8 +176,8 @@ async function startServer() {
     console.log('✅ Database connected successfully');
 
     // Start server
-    app.listen(PORT, () => {
-      console.log(`🚀 Kepler TapTrack API server running on port ${PORT}`);
+    app.listen(PORT, HOST, () => {
+      console.log(`🚀 Kepler TapTrack API server running on ${HOST}:${PORT}`);
       console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🌐 Allowed origins: ${allowedOrigins.join(', ')}`);
     });
