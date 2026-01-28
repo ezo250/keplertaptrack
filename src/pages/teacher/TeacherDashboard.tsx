@@ -86,10 +86,14 @@ export default function TeacherDashboard() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    // Simulate refresh delay without reloading
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsRefreshing(false);
-    // The data will automatically refresh due to React Query or context updates
+    try {
+      // Force re-fetch data by triggering a re-render
+      // This will cause useData hook to fetch fresh data
+      window.dispatchEvent(new Event('focus'));
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   return (
