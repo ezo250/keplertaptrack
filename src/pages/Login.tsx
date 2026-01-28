@@ -105,17 +105,10 @@ export default function Login() {
             transition={{ delay: 0.6 }}
           >
             <div className="flex items-center gap-3">
-              <div className="flex -space-x-3">
-                {[1, 2, 3].map((i) => (
-                  <div 
-                    key={i} 
-                    className="w-10 h-10 rounded-full bg-white/20 border-2 border-white/40 flex items-center justify-center text-sm font-medium"
-                  >
-                    {['JM', 'MC', 'EN'][i-1]}
-                  </div>
-                ))}
+              <div className="w-12 h-12 rounded-full bg-white/20 border-2 border-white/40 flex items-center justify-center">
+                <GraduationCap className="w-6 h-6 text-white" />
               </div>
-              <span className="text-white/70">Trusted by teachers at Kepler College</span>
+              <span className="text-white/70">Trusted by Kepler College</span>
             </div>
           </motion.div>
         </div>

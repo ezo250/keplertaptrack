@@ -82,7 +82,7 @@ export default function TeacherDashboard() {
       />
       
       {/* Quick Settings Bar */}
-      <div className="px-6 pt-6">
+      <div className="px-4 sm:px-6 pt-6">
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -95,34 +95,34 @@ export default function TeacherDashboard() {
             className="gap-2"
           >
             <Key className="w-4 h-4" />
-            Change Password
+            <span className="hidden sm:inline">Change Password</span>
           </Button>
         </motion.div>
       </div>
       
-      <div className="p-6 space-y-8">
+      <div className="p-4 sm:p-6 space-y-6 sm:space-y-8">
         {/* Quick Actions */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-4"
+          className="grid grid-cols-1 sm:grid-cols-2 gap-4"
         >
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => setIsPickupDialogOpen(true)}
-            className="relative p-6 rounded-xl bg-gradient-to-br from-primary to-primary/80 text-white overflow-hidden group"
+            className="relative p-4 sm:p-6 rounded-xl bg-gradient-to-br from-primary to-primary/80 text-white overflow-hidden group"
           >
             <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="absolute -right-8 -bottom-8 w-32 h-32 rounded-full bg-white/5 blur-2xl" />
             
-            <div className="relative flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center">
-                <ArrowUp className="w-7 h-7" />
+            <div className="relative flex items-center gap-3 sm:gap-4">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-white/20 flex items-center justify-center">
+                <ArrowUp className="w-6 h-6 sm:w-7 sm:h-7" />
               </div>
               <div className="text-left">
-                <h3 className="text-xl font-heading font-bold">Pick Up Device</h3>
-                <p className="text-white/80">{availableDevices.length} devices available</p>
+                <h3 className="text-lg sm:text-xl font-heading font-bold">Pick Up Device</h3>
+                <p className="text-white/80 text-sm sm:text-base">{availableDevices.length} devices available</p>
               </div>
             </div>
           </motion.button>
@@ -132,7 +132,7 @@ export default function TeacherDashboard() {
             whileTap={{ scale: 0.98 }}
             onClick={() => setIsReturnDialogOpen(true)}
             disabled={myDevices.length === 0}
-            className={`relative p-6 rounded-xl overflow-hidden group ${
+            className={`relative p-4 sm:p-6 rounded-xl overflow-hidden group ${
               myDevices.length > 0
                 ? 'bg-gradient-to-br from-secondary to-secondary/80 text-white'
                 : 'bg-muted text-muted-foreground cursor-not-allowed'
@@ -141,13 +141,13 @@ export default function TeacherDashboard() {
             <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="absolute -right-8 -bottom-8 w-32 h-32 rounded-full bg-white/5 blur-2xl" />
             
-            <div className="relative flex items-center gap-4">
-              <div className={`w-14 h-14 rounded-xl ${myDevices.length > 0 ? 'bg-white/20' : 'bg-muted-foreground/10'} flex items-center justify-center`}>
-                <ArrowDown className="w-7 h-7" />
+            <div className="relative flex items-center gap-3 sm:gap-4">
+              <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl ${myDevices.length > 0 ? 'bg-white/20' : 'bg-muted-foreground/10'} flex items-center justify-center`}>
+                <ArrowDown className="w-6 h-6 sm:w-7 sm:h-7" />
               </div>
               <div className="text-left">
-                <h3 className="text-xl font-heading font-bold">Return Device</h3>
-                <p className={myDevices.length > 0 ? 'text-white/80' : ''}>
+                <h3 className="text-lg sm:text-xl font-heading font-bold">Return Device</h3>
+                <p className={`text-sm sm:text-base ${myDevices.length > 0 ? 'text-white/80' : ''}`}>
                   {myDevices.length > 0 
                     ? `${myDevices.length} device(s) with you` 
                     : 'No devices to return'}
@@ -188,7 +188,7 @@ export default function TeacherDashboard() {
         )}
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           <StatCard
             title="Available Devices"
             value={availableDevices.length}
@@ -220,14 +220,14 @@ export default function TeacherDashboard() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.35 }}
-            className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl border border-primary/20 p-6"
+            className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl border border-primary/20 p-4 sm:p-6"
           >
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
                 <Calendar className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h2 className="text-xl font-heading font-semibold text-foreground">{currentDay}</h2>
+                <h2 className="text-lg sm:text-xl font-heading font-semibold text-foreground">{currentDay}</h2>
                 <p className="text-sm text-muted-foreground">
                   {todaySchedule.length} {todaySchedule.length === 1 ? 'class' : 'classes'} today
                 </p>

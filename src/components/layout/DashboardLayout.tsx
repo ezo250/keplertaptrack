@@ -11,7 +11,7 @@ export default function DashboardLayout({ userRole }: DashboardLayoutProps) {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Sidebar userRole={userRole} />
-      <main className="ml-64 flex-1 flex flex-col">
+      <main className="lg:ml-64 flex-1 flex flex-col">
         <Outlet />
         <Footer />
       </main>
