@@ -1,0 +1,501 @@
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '@/contexts/AuthContext';
+import { useData } from '@/contexts/DataContext';
+import Header from '@/components/layout/Header';
+import StatCard from '@/components/dashboard/StatCard';
+import DeviceCard from '@/components/dashboard/DeviceCard';
+import PickupSuccessModal from '@/components/modals/PickupSuccessModal';
+import ReturnSuccessModal from '@/components/modals/ReturnSuccessModal';
+import ChangePasswordModal from '@/components/modals/ChangePasswordModal';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { 
+  Tablet, 
+  Calendar, 
+  Clock, 
+  ArrowUp, 
+  ArrowDown,
+  CheckCircle,
+  AlertCircle,
+  Key,
+  MapPin,
+  GraduationCap
+} from 'lucide-react';
+import { Device } from '@/types';
+
+export default function TeacherDashboard() {
+  const { user } = useAuth();
+  const { 
+    devices, 
+    timetable, 
+    getAvailableDevices, 
+    getUserDevices,
+    pickupDevice,
+    returnDevice
+  } = useData();
+
+  const [isPickupDialogOpen, setIsPickupDialogOpen] = useState(false);
+  const [isReturnDialogOpen, setIsReturnDialogOpen] = useState(false);
+  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+  const [showPickupSuccess, setShowPickupSuccess] = useState(false);
+  const [showReturnSuccess, setShowReturnSuccess] = useState(false);
+  const [lastActionDevice, setLastActionDevice] = useState('');
+  const [showChangePassword, setShowChangePassword] = useState(false);
+
+  const availableDevices = getAvailableDevices();
+  const myDevices = getUserDevices(user?.id || '');
+  const mySchedule = timetable.filter(t => t.teacherId === user?.id);
+  
+  // Get current day
+  const currentDay = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+  const todaySchedule = mySchedule.filter(t => t.day === currentDay);
+
+  const handlePickup = (device: Device) => {
+    if (!user) return;
+    
+    pickupDevice(device.id, user.id, user.name);
+    setLastActionDevice(device.deviceId);
+    setIsPickupDialogOpen(false);
+    setShowPickupSuccess(true);
+  };
+
+  const handleReturn = (device: Device) => {
+    if (!user) return;
+    
+    returnDevice(device.id, user.id, user.name);
+    setLastActionDevice(device.deviceId);
+    setIsReturnDialogOpen(false);
+    setShowReturnSuccess(true);
+  };
+
+  return (
+    <div className="min-h-screen">
+      <Header 
+        title={`Hello, ${user?.name?.split(' ')[0]}!`}
+        subtitle="Manage your attendance devices here"
+      />
+      
+      {/* Quick Settings Bar */}
+      <div className="px-6 pt-6">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex justify-end"
+        >
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowChangePassword(true)}
+            className="gap-2"
+          >
+            <Key className="w-4 h-4" />
+            Change Password
+          </Button>
+        </motion.div>
+      </div>
+      
+      <div className="p-6 space-y-8">
+        {/* Quick Actions */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="grid grid-cols-1 md:grid-cols-2 gap-4"
+        >
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setIsPickupDialogOpen(true)}
+            className="relative p-6 rounded-xl bg-gradient-to-br from-primary to-primary/80 text-white overflow-hidden group"
+          >
+            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="absolute -right-8 -bottom-8 w-32 h-32 rounded-full bg-white/5 blur-2xl" />
+            
+            <div className="relative flex items-center gap-4">
+              <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center">
+                <ArrowUp className="w-7 h-7" />
+              </div>
+              <div className="text-left">
+                <h3 className="text-xl font-heading font-bold">Pick Up Device</h3>
+                <p className="text-white/80">{availableDevices.length} devices available</p>
+              </div>
+            </div>
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setIsReturnDialogOpen(true)}
+            disabled={myDevices.length === 0}
+            className={`relative p-6 rounded-xl overflow-hidden group ${
+              myDevices.length > 0
+                ? 'bg-gradient-to-br from-secondary to-secondary/80 text-white'
+                : 'bg-muted text-muted-foreground cursor-not-allowed'
+            }`}
+          >
+            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="absolute -right-8 -bottom-8 w-32 h-32 rounded-full bg-white/5 blur-2xl" />
+            
+            <div className="relative flex items-center gap-4">
+              <div className={`w-14 h-14 rounded-xl ${myDevices.length > 0 ? 'bg-white/20' : 'bg-muted-foreground/10'} flex items-center justify-center`}>
+                <ArrowDown className="w-7 h-7" />
+              </div>
+              <div className="text-left">
+                <h3 className="text-xl font-heading font-bold">Return Device</h3>
+                <p className={myDevices.length > 0 ? 'text-white/80' : ''}>
+                  {myDevices.length > 0 
+                    ? `${myDevices.length} device(s) with you` 
+                    : 'No devices to return'}
+                </p>
+              </div>
+            </div>
+          </motion.button>
+        </motion.div>
+
+        {/* My Devices Alert */}
+        {myDevices.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex items-start gap-4"
+          >
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <AlertCircle className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h4 className="font-medium text-foreground">You have {myDevices.length} device(s)</h4>
+              <p className="text-sm text-muted-foreground mt-1">
+                Remember to return them after your class so other teachers can use them.
+              </p>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {myDevices.map(device => (
+                  <span 
+                    key={device.id} 
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium"
+                  >
+                    <Tablet className="w-4 h-4" />
+                    {device.deviceId}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <StatCard
+            title="Available Devices"
+            value={availableDevices.length}
+            subtitle="At pickup station"
+            icon={Tablet}
+            variant="secondary"
+            delay={0.1}
+          />
+          <StatCard
+            title="My Classes Today"
+            value={todaySchedule.length}
+            subtitle="Scheduled classes"
+            icon={Calendar}
+            delay={0.2}
+          />
+          <StatCard
+            title="Devices With Me"
+            value={myDevices.length}
+            subtitle={myDevices.length > 0 ? 'Remember to return' : 'All clear!'}
+            icon={myDevices.length > 0 ? Clock : CheckCircle}
+            variant={myDevices.length > 0 ? 'warning' : 'default'}
+            delay={0.3}
+          />
+        </div>
+
+        {/* Today's Classes Card */}
+        {todaySchedule.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl border border-primary/20 p-6"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+                <Calendar className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-xl font-heading font-semibold text-foreground">{currentDay}</h2>
+                <p className="text-sm text-muted-foreground">
+                  {todaySchedule.length} {todaySchedule.length === 1 ? 'class' : 'classes'} today
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {todaySchedule.sort((a, b) => a.startTime.localeCompare(b.startTime)).map((classItem, index) => (
+                <motion.div
+                  key={classItem.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 + index * 0.1 }}
+                  className="bg-card rounded-lg border border-border/50 p-4 space-y-3"
+                >
+                  {/* Time */}
+                  <div className="flex items-center gap-2 text-foreground">
+                    <Clock className="w-5 h-5 text-primary" />
+                    <span className="text-lg font-semibold">
+                      {classItem.startTime} to {classItem.endTime}
+                    </span>
+                  </div>
+
+                  {/* Course */}
+                  <div className="flex items-center gap-2">
+                    <GraduationCap className="w-5 h-5 text-primary" />
+                    <span className="text-xl font-heading font-bold text-foreground">
+                      {classItem.course}
+                    </span>
+                  </div>
+
+                  {/* Classroom */}
+                  {classItem.classroom && (
+                    <div className="flex items-center gap-2 bg-primary/10 rounded-lg px-3 py-2 w-fit">
+                      <MapPin className="w-5 h-5 text-primary" />
+                      <span className="font-medium text-primary">
+                        {classItem.classroom}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Reminder */}
+                  {myDevices.length === 0 && (
+                    <div className="flex items-start gap-2 mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                      <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                      <p className="text-sm text-orange-900 font-medium">
+                        Don't forget to pick up a device!
+                      </p>
+                    </div>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {/* My Schedule */}
+        {mySchedule.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            className="bg-card rounded-xl border border-border/50 p-6"
+          >
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Calendar className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-xl font-heading font-semibold text-foreground">My Teaching Schedule</h2>
+                <p className="text-sm text-muted-foreground">Your weekly class schedule</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map(day => {
+                const dayClasses = mySchedule.filter(t => t.day === day);
+                if (dayClasses.length === 0) return null;
+
+                return (
+                  <div key={day} className="rounded-lg border border-border/50 overflow-hidden">
+                    <div className="bg-muted/30 px-4 py-2 border-b border-border/50">
+                      <h3 className="font-medium text-foreground flex items-center gap-2">
+                        <span className={day === currentDay ? 'text-primary' : ''}>
+                          {day}
+                        </span>
+                        {day === currentDay && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                            Today
+                          </span>
+                        )}
+                      </h3>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      {dayClasses.sort((a, b) => a.startTime.localeCompare(b.startTime)).map((classItem, index) => (
+                        <motion.div
+                          key={classItem.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.4 + index * 0.05 }}
+                          className="p-4 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors space-y-2"
+                        >
+                          {/* Time */}
+                          <div className="flex items-center gap-2 text-foreground">
+                            <Clock className="w-4 h-4 text-primary" />
+                            <span className="font-semibold">
+                              {classItem.startTime} to {classItem.endTime}
+                            </span>
+                          </div>
+
+                          {/* Course */}
+                          <div className="flex items-center gap-2">
+                            <GraduationCap className="w-4 h-4 text-primary" />
+                            <span className="font-bold text-foreground">{classItem.course}</span>
+                          </div>
+
+                          {/* Classroom */}
+                          {classItem.classroom && (
+                            <div className="flex items-center gap-2 bg-primary/10 rounded-md px-2.5 py-1.5 w-fit">
+                              <MapPin className="w-4 h-4 text-primary" />
+                              <span className="font-medium text-primary text-sm">
+                                {classItem.classroom}
+                              </span>
+                            </div>
+                          )}
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Available Devices Grid */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="bg-card rounded-xl border border-border/50 p-6"
+        >
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-heading font-semibold text-foreground">Available at Pickup Station</h2>
+              <p className="text-sm text-muted-foreground">Click on a device to pick it up</p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {availableDevices.slice(0, 8).map((device, index) => (
+              <DeviceCard 
+                key={device.id} 
+                device={device}
+                onClick={() => {
+                  setSelectedDevice(device);
+                  setIsPickupDialogOpen(true);
+                }}
+                delay={0.5 + index * 0.05}
+              />
+            ))}
+          </div>
+          
+          {availableDevices.length === 0 && (
+            <div className="text-center py-12">
+              <Tablet className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+              <p className="text-muted-foreground">No devices available at the moment</p>
+              <p className="text-sm text-muted-foreground mt-1">Check back later or contact admin</p>
+            </div>
+          )}
+        </motion.div>
+      </div>
+
+      {/* Pickup Dialog */}
+      <Dialog open={isPickupDialogOpen} onOpenChange={setIsPickupDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowUp className="w-5 h-5 text-primary" />
+              Pick Up Device
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <p className="text-muted-foreground">
+              Select a device to pick up from the station:
+            </p>
+            <div className="grid grid-cols-2 gap-3 max-h-[300px] overflow-y-auto">
+              {availableDevices.map((device) => (
+                <motion.button
+                  key={device.id}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handlePickup(device)}
+                  className="p-4 rounded-lg border border-border hover:border-primary hover:bg-primary/5 transition-all text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Tablet className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{device.deviceId}</p>
+                      <p className="text-xs text-success">Available</p>
+                    </div>
+                  </div>
+                </motion.button>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Return Dialog */}
+      <Dialog open={isReturnDialogOpen} onOpenChange={setIsReturnDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowDown className="w-5 h-5 text-secondary" />
+              Return Device
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <p className="text-muted-foreground">
+              Select the device you want to return:
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              {myDevices.map((device) => (
+                <motion.button
+                  key={device.id}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleReturn(device)}
+                  className="p-4 rounded-lg border border-border hover:border-secondary hover:bg-secondary/5 transition-all text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
+                      <Tablet className="w-5 h-5 text-secondary" />
+                    </div>
+                    <div>
+                      <p className="font-medium">{device.deviceId}</p>
+                      <p className="text-xs text-primary">With you</p>
+                    </div>
+                  </div>
+                </motion.button>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Success Modals */}
+      <PickupSuccessModal 
+        isOpen={showPickupSuccess}
+        onClose={() => setShowPickupSuccess(false)}
+        deviceId={lastActionDevice}
+      />
+      
+      <ReturnSuccessModal
+        isOpen={showReturnSuccess}
+        onClose={() => setShowReturnSuccess(false)}
+        deviceId={lastActionDevice}
+      />
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        isOpen={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
+        userId={user?.id || ''}
+      />
+    </div>
+  );
+}
