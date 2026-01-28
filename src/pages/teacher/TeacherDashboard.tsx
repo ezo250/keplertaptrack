@@ -8,6 +8,7 @@ import DeviceCard from '@/components/dashboard/DeviceCard';
 import PickupSuccessModal from '@/components/modals/PickupSuccessModal';
 import ReturnSuccessModal from '@/components/modals/ReturnSuccessModal';
 import ChangePasswordModal from '@/components/modals/ChangePasswordModal';
+import DeviceRestrictionModal from '@/components/modals/DeviceRestrictionModal';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -25,7 +26,8 @@ import {
   AlertCircle,
   Key,
   MapPin,
-  GraduationCap
+  GraduationCap,
+  RefreshCw
 } from 'lucide-react';
 import { Device } from '@/types';
 
@@ -47,6 +49,8 @@ export default function TeacherDashboard() {
   const [showReturnSuccess, setShowReturnSuccess] = useState(false);
   const [lastActionDevice, setLastActionDevice] = useState('');
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showRestrictionModal, setShowRestrictionModal] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const availableDevices = getAvailableDevices();
   const myDevices = getUserDevices(user?.id || '');
@@ -58,6 +62,12 @@ export default function TeacherDashboard() {
 
   const handlePickup = (device: Device) => {
     if (!user) return;
+    
+    // Prevent picking up if teacher already has a device
+    if (myDevices.length > 0) {
+      setShowRestrictionModal(true);
+      return;
+    }
     
     pickupDevice(device.id, user.id, user.name);
     setLastActionDevice(device.deviceId);
@@ -74,6 +84,14 @@ export default function TeacherDashboard() {
     setShowReturnSuccess(true);
   };
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    // Simulate refresh delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Force re-render by updating a state that triggers data refresh
+    window.location.reload();
+  };
+
   return (
     <div className="min-h-screen">
       <Header 
@@ -86,8 +104,19 @@ export default function TeacherDashboard() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex justify-end"
+          className="flex justify-between items-center"
         >
+          <Button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </Button>
+          
           <Button
             variant="outline"
             size="sm"
@@ -110,8 +139,19 @@ export default function TeacherDashboard() {
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => setIsPickupDialogOpen(true)}
-            className="relative p-4 sm:p-6 rounded-xl bg-gradient-to-br from-primary to-primary/80 text-white overflow-hidden group"
+            onClick={() => {
+              if (myDevices.length > 0) {
+                setShowRestrictionModal(true);
+              } else {
+                setIsPickupDialogOpen(true);
+              }
+            }}
+            disabled={myDevices.length > 0}
+            className={`relative p-4 sm:p-6 rounded-xl overflow-hidden group ${
+              myDevices.length > 0
+                ? 'bg-muted text-muted-foreground cursor-not-allowed opacity-60'
+                : 'bg-gradient-to-br from-primary to-primary/80 text-white'
+            }`}
           >
             <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="absolute -right-8 -bottom-8 w-32 h-32 rounded-full bg-white/5 blur-2xl" />
@@ -122,7 +162,13 @@ export default function TeacherDashboard() {
               </div>
               <div className="text-left">
                 <h3 className="text-lg sm:text-xl font-heading font-bold">Pick Up Device</h3>
-                <p className="text-white/80 text-sm sm:text-base">{availableDevices.length} devices available</p>
+                <p className={`text-sm sm:text-base ${
+                  myDevices.length > 0 ? 'text-muted-foreground' : 'text-white/80'
+                }`}>
+                  {myDevices.length > 0 
+                    ? 'Return current device first' 
+                    : `${availableDevices.length} devices available`}
+                </p>
               </div>
             </div>
           </motion.button>
@@ -495,6 +541,13 @@ export default function TeacherDashboard() {
         isOpen={showChangePassword}
         onClose={() => setShowChangePassword(false)}
         userId={user?.id || ''}
+      />
+      
+      {/* Device Restriction Modal */}
+      <DeviceRestrictionModal
+        isOpen={showRestrictionModal}
+        onClose={() => setShowRestrictionModal(false)}
+        currentDeviceId={myDevices[0]?.deviceId}
       />
     </div>
   );

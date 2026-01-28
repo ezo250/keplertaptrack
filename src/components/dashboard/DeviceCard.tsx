@@ -45,7 +45,7 @@ export default function DeviceCard({ device, onClick, showActions = false, delay
       whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
       onClick={onClick}
       className={cn(
-        'relative p-4 rounded-lg bg-card border border-border/50 cursor-pointer transition-all duration-300',
+        'relative p-4 rounded-lg bg-card border border-border/50 cursor-pointer transition-all duration-300 min-h-[140px] flex flex-col',
         'hover:shadow-lg',
         config.bgGlow,
         onClick && 'hover:border-primary/30'
@@ -66,24 +66,26 @@ export default function DeviceCard({ device, onClick, showActions = false, delay
       
       <h3 className="text-lg font-bold text-foreground mb-2">{device.deviceId}</h3>
       
-      {device.status === 'available' ? (
-        <p className="text-sm text-muted-foreground font-medium">
-          Ready for pickup
-        </p>
-      ) : (
-        <div className="space-y-1.5">
-          <p className="text-sm text-foreground flex items-center gap-1.5 font-medium">
-            <User className="w-4 h-4 text-muted-foreground" />
-            {device.currentUserName}
+      <div className="flex-1">
+        {device.status === 'available' ? (
+          <p className="text-sm text-muted-foreground font-medium">
+            Ready for pickup
           </p>
-          {device.pickedUpAt && (
-            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5" />
-              {formatDistanceToNow(new Date(device.pickedUpAt), { addSuffix: true })}
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm text-foreground flex items-center gap-1.5 font-medium">
+              <User className="w-4 h-4 text-muted-foreground" />
+              {device.currentUserName}
             </p>
-          )}
-        </div>
-      )}
+            {device.pickedUpAt && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" />
+                {formatDistanceToNow(new Date(device.pickedUpAt), { addSuffix: true })}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
       
       {device.status === 'overdue' && (
         <motion.div
