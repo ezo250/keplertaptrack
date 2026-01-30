@@ -120,6 +120,121 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
     });
   };
 
+  const parseGridTimetable = (workbook: XLSX.WorkBook): ParsedTimetableEntry[] => {
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    const range = XLSX.utils.decode_range(firstSheet['!ref'] || 'A1');
+    
+    // Try to find teacher name (usually in the first few rows)
+    let teacherName = '';
+    for (let row = 0; row < Math.min(5, range.e.r); row++) {
+      const cell = firstSheet[XLSX.utils.encode_cell({ r: row, c: 0 })];
+      if (cell && cell.v && typeof cell.v === 'string') {
+        const cellValue = cell.v.toString().trim();
+        // Check if this looks like a name (contains spaces, no numbers at start)
+        if (cellValue.includes(' ') && !/^\d/.test(cellValue) && cellValue.length < 50) {
+          teacherName = cellValue;
+          break;
+        }
+      }
+    }
+
+    const entries: ParsedTimetableEntry[] = [];
+    
+    // Map day abbreviations to full names
+    const dayMap: Record<string, string> = {
+      'mo': 'Monday', 'mon': 'Monday', 'monday': 'Monday',
+      'tu': 'Tuesday', 'tue': 'Tuesday', 'tuesday': 'Tuesday',
+      'we': 'Wednesday', 'wed': 'Wednesday', 'wednesday': 'Wednesday',
+      'th': 'Thursday', 'thu': 'Thursday', 'thursday': 'Thursday',
+      'fr': 'Friday', 'fri': 'Friday', 'friday': 'Friday',
+    };
+
+    // Find day columns
+    const dayColumns: Array<{ col: number; day: string }> = [];
+    for (let col = 0; col <= range.e.c; col++) {
+      for (let row = 0; row < Math.min(10, range.e.r); row++) {
+        const cell = firstSheet[XLSX.utils.encode_cell({ r: row, c: col })];
+        if (cell && cell.v) {
+          const cellValue = cell.v.toString().trim().toLowerCase();
+          const matchedDay = dayMap[cellValue];
+          if (matchedDay) {
+            dayColumns.push({ col, day: matchedDay });
+            break;
+          }
+        }
+      }
+    }
+
+    // Find session rows (rows with time information)
+    const sessionRows: Array<{ row: number; startTime: string; endTime: string }> = [];
+    for (let row = 0; row <= range.e.r; row++) {
+      for (let col = 0; col <= Math.min(2, range.e.c); col++) {
+        const cell = firstSheet[XLSX.utils.encode_cell({ r: row, c: col })];
+        if (cell && cell.v) {
+          const cellValue = cell.v.toString().trim();
+          // Look for time patterns like "8:00 - 9:00" or "8:00-9:00" or in separate cells
+          const timeMatch = cellValue.match(/(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})/);
+          if (timeMatch) {
+            sessionRows.push({
+              row,
+              startTime: timeMatch[1],
+              endTime: timeMatch[2],
+            });
+            break;
+          }
+        }
+      }
+    }
+
+    // Parse course information from grid cells
+    dayColumns.forEach(({ col, day }) => {
+      sessionRows.forEach(({ row, startTime, endTime }) => {
+        const cell = firstSheet[XLSX.utils.encode_cell({ r: row, c: col })];
+        if (cell && cell.v) {
+          const cellValue = cell.v.toString().trim();
+          
+          // Skip empty cells, breaks, or cells that only contain day names
+          if (!cellValue || 
+              cellValue.toLowerCase().includes('break') || 
+              cellValue.toLowerCase() === day.toLowerCase()) {
+            return;
+          }
+
+          // Parse multi-line cell content
+          const lines = cellValue.split('\n').map(l => l.trim()).filter(l => l);
+          
+          if (lines.length > 0) {
+            // First line is usually the course name
+            let course = lines[0];
+            let classroom = '';
+
+            // Look for classroom in the last line (usually contains "Classroom" or "Room")
+            for (let i = lines.length - 1; i >= 1; i--) {
+              if (lines[i].toLowerCase().includes('classroom') || 
+                  lines[i].toLowerCase().includes('room')) {
+                classroom = lines[i];
+                break;
+              }
+            }
+
+            entries.push({
+              teacherName: teacherName,
+              course: course,
+              classroom: classroom,
+              day: day,
+              startTime: startTime,
+              endTime: endTime,
+              isValid: true,
+              errors: [],
+            });
+          }
+        }
+      });
+    });
+
+    return entries;
+  };
+
   const parseExcel = (file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -127,13 +242,35 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array' });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(firstSheet);
         
-        const validated = jsonData.map(validateEntry);
+        // Try to detect format - check if it's a grid format or simple list
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as any[][];
+        
+        // Check if first row has day names (grid format) or column headers (list format)
+        const firstRow = jsonData[0] || [];
+        const hasGridFormat = firstRow.some((cell: any) => {
+          if (!cell) return false;
+          const cellStr = cell.toString().toLowerCase().trim();
+          return ['mo', 'tu', 'we', 'th', 'fr', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+            .some(day => cellStr.includes(day));
+        });
+
+        let validated: ParsedTimetableEntry[];
+        
+        if (hasGridFormat) {
+          // Parse as grid timetable (like the uploaded image)
+          const parsedEntries = parseGridTimetable(workbook);
+          validated = parsedEntries.map(validateEntry);
+          toast.success(`Parsed ${validated.length} entries from grid timetable`);
+        } else {
+          // Parse as simple list format
+          const listData = XLSX.utils.sheet_to_json(firstSheet);
+          validated = listData.map(validateEntry);
+          const validCount = validated.filter(e => e.isValid).length;
+          toast.success(`Parsed ${validCount} valid entries from ${validated.length} total`);
+        }
+        
         setParsedData(validated);
-        
-        const validCount = validated.filter(e => e.isValid).length;
-        toast.success(`Parsed ${validCount} valid entries from ${validated.length} total`);
       } catch (error: any) {
         toast.error(`Failed to parse Excel: ${error.message}`);
       }
@@ -271,15 +408,32 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
           </div>
 
           {/* File Format Info */}
-          <div className="p-4 bg-muted/30 border border-border/50 rounded-lg">
-            <h4 className="text-sm font-semibold text-foreground mb-2">Required Columns:</h4>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-muted-foreground">
-              <div>• teacherName (required)</div>
-              <div>• course (required)</div>
-              <div>• day (required)</div>
-              <div>• startTime (required)</div>
-              <div>• endTime (required)</div>
-              <div>• classroom (optional)</div>
+          <div className="p-4 bg-muted/30 border border-border/50 rounded-lg space-y-3">
+            <div>
+              <h4 className="text-sm font-semibold text-foreground mb-2">Supported Formats:</h4>
+              <div className="space-y-2 text-xs text-muted-foreground">
+                <div className="font-medium">1. Simple List Format (CSV/Excel):</div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 pl-4">
+                  <div>• teacherName (required)</div>
+                  <div>• course (required)</div>
+                  <div>• day (required)</div>
+                  <div>• startTime (required)</div>
+                  <div>• endTime (required)</div>
+                  <div>• classroom (optional)</div>
+                </div>
+              </div>
+              <div className="mt-2 text-xs text-muted-foreground">
+                <div className="font-medium">2. Grid Format (Excel):</div>
+                <div className="pl-4">
+                  • Teacher name at the top
+                  <br />
+                  • Days as column headers (Mo, Tu, We, Th, Fr)
+                  <br />
+                  • Sessions with time slots as rows
+                  <br />
+                  • Course information in grid cells
+                </div>
+              </div>
             </div>
           </div>
 
