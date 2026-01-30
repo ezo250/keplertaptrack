@@ -45,47 +45,24 @@ export default function TeacherDevices() {
   const handlePickup = (device: Device) => {
     if (!user) return;
     
-    // Check if authorized first
-    if (!isAuthorized) {
-      setSelectedDevice(device);
-      setScannerAction('pickup');
-      setShowQRScanner(true);
-      return;
-    }
-    
-    // Prevent picking up if teacher already has a device
-    if (myDevices.length > 0) {
-      setSelectedDevice(null);
-      setShowRestrictionModal(true);
-      return;
-    }
-    
-    pickupDevice(device.id, user.id, user.name);
-    setLastActionDevice(device.deviceId);
-    setSelectedDevice(null);
-    setIsAuthorized(false); // Reset authorization
-    setShowPickupSuccess(true);
+    // Always require QR authorization first
+    setSelectedDevice(device);
+    setScannerAction('pickup');
+    setShowQRScanner(true);
   };
 
   const handleReturn = (device: Device) => {
     if (!user) return;
     
-    // Check if authorized first
-    if (!isAuthorized) {
-      setSelectedDevice(device);
-      setScannerAction('return');
-      setShowQRScanner(true);
-      return;
-    }
-    
-    returnDevice(device.id, user.id, user.name);
-    setLastActionDevice(device.deviceId);
-    setSelectedDevice(null);
-    setIsAuthorized(false); // Reset authorization
-    setShowReturnSuccess(true);
+    // Always require QR authorization first
+    setSelectedDevice(device);
+    setScannerAction('return');
+    setShowQRScanner(true);
   };
 
   const handleQRScan = (result: string) => {
+    console.log('QR Scanned Result:', result);
+    
     // Validate QR code based on action type
     const expectedPrefix = scannerAction === 'pickup' ? 'PICKUP_AUTH_' : 'RETURN_AUTH_';
     
@@ -93,15 +70,37 @@ export default function TeacherDevices() {
       setIsAuthorized(true);
       setShowQRScanner(false);
       
-      // Proceed with the action
-      if (selectedDevice) {
-        if (scannerAction === 'pickup') {
-          handlePickup(selectedDevice);
-        } else {
-          handleReturn(selectedDevice);
+      // Automatically proceed with the action
+      setTimeout(() => {
+        if (selectedDevice) {
+          if (scannerAction === 'pickup') {
+            // Proceed with pickup
+            if (myDevices.length > 0) {
+              setSelectedDevice(null);
+              setShowRestrictionModal(true);
+              setIsAuthorized(false);
+              return;
+            }
+            
+            pickupDevice(selectedDevice.id, user!.id, user!.name);
+            setLastActionDevice(selectedDevice.deviceId);
+            setSelectedDevice(null);
+            setIsAuthorized(false);
+            setShowPickupSuccess(true);
+          } else {
+            // Proceed with return
+            returnDevice(selectedDevice.id, user!.id, user!.name);
+            setLastActionDevice(selectedDevice.deviceId);
+            setSelectedDevice(null);
+            setIsAuthorized(false);
+            setShowReturnSuccess(true);
+          }
         }
-      }
+      }, 500);
     } else {
+      setIsAuthorized(false);
+      setShowQRScanner(false);
+      setSelectedDevice(null);
       alert(`Invalid QR code. Please scan the correct ${scannerAction} authorization code.`);
     }
   };
