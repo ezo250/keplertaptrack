@@ -19,6 +19,8 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
   const [scanned, setScanned] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const lastDecodeRef = useRef<number>(0);
 
   useEffect(() => {
     if (isOpen) {
@@ -66,26 +68,56 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
   const startScanning = () => {
     if (!videoRef.current) return;
 
-    // Initialize ZXing reader if not present
     if (!readerRef.current) {
       readerRef.current = new BrowserMultiFormatReader();
     }
 
-    // Use decodeFromVideoDevice to bind directly to the video element
-    readerRef.current
-      .decodeFromVideoDevice(undefined, videoRef.current, (result, err) => {
-        if (scanned) return; // prevent multiple
-        if (result) {
-          handleQRDetected(result.getText());
-        } else if (err && !(err instanceof NotFoundException)) {
-          // Non-not-found errors can be shown once
-          console.error('QR scan error:', err);
+    const loop = () => {
+      if (scanned) return;
+      const now = performance.now();
+      // Throttle decoding attempts to every 250ms to avoid flicker
+      if (now - lastDecodeRef.current >= 250 && videoRef.current && canvasRef.current) {
+        try {
+          const video = videoRef.current;
+          const canvas = canvasRef.current;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+            if (vw && vh) {
+              // Set canvas to video size
+              canvas.width = vw;
+              canvas.height = vh;
+              // Draw current frame
+              ctx.drawImage(video, 0, 0, vw, vh);
+              lastDecodeRef.current = now;
+              const dataUrl = canvas.toDataURL('image/png');
+              const img = new Image();
+              img.onload = async () => {
+                try {
+                  const result = await readerRef.current!.decodeFromImage(img as HTMLImageElement);
+                  if (result && !scanned) {
+                    handleQRDetected(result.getText());
+                    return;
+                  }
+                } catch (e) {
+                  if (e && !(e instanceof NotFoundException)) {
+                    // Ignore not found; log others once in a while
+                    // console.error('QR decode error:', e);
+                  }
+                }
+              };
+              img.src = dataUrl;
+            }
+          }
+        } catch (e) {
+          // Swallow frame errors to keep loop alive
         }
-      })
-      .catch((e) => {
-        console.error('Failed to start decoding:', e);
-        setError('Could not start QR scanner.');
-      });
+      }
+      rafRef.current = requestAnimationFrame(loop);
+    };
+
+    rafRef.current = requestAnimationFrame(loop);
   };
 
   const handleQRDetected = (qrData: string) => {
@@ -108,6 +140,11 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
           readerRef.current.reset();
         } catch {}
         readerRef.current = null;
+      }
+
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
       }
 
       if (streamRef.current) {
