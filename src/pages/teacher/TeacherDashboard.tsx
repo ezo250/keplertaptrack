@@ -9,12 +9,14 @@ import PickupSuccessModal from '@/components/modals/PickupSuccessModal';
 import ReturnSuccessModal from '@/components/modals/ReturnSuccessModal';
 import ChangePasswordModal from '@/components/modals/ChangePasswordModal';
 import DeviceRestrictionModal from '@/components/modals/DeviceRestrictionModal';
+import QRScanner from '@/components/teacher/QRScanner';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { 
   Tablet, 
@@ -27,9 +29,11 @@ import {
   Key,
   MapPin,
   GraduationCap,
-  RefreshCw
+  RefreshCw,
+  QrCode
 } from 'lucide-react';
 import { Device } from '@/types';
+import { qrCodeAPI } from '@/services/api';
 
 export default function TeacherDashboard() {
   const { user } = useAuth();
@@ -51,6 +55,10 @@ export default function TeacherDashboard() {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showRestrictionModal, setShowRestrictionModal] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
+  const [qrScanMode, setQrScanMode] = useState<'pickup' | 'return'>('pickup');
+  const [qrError, setQrError] = useState('');
+  const [isVerifyingQR, setIsVerifyingQR] = useState(false);
 
   const availableDevices = getAvailableDevices();
   const myDevices = getUserDevices(user?.id || '');
@@ -60,7 +68,7 @@ export default function TeacherDashboard() {
   const currentDay = new Date().toLocaleDateString('en-US', { weekday: 'long' });
   const todaySchedule = mySchedule.filter(t => t.day === currentDay);
 
-  const handlePickup = (device: Device) => {
+  const handlePickupClick = (device: Device) => {
     if (!user) return;
     
     // Prevent picking up if teacher already has a device
@@ -69,19 +77,70 @@ export default function TeacherDashboard() {
       return;
     }
     
-    pickupDevice(device.id, user.id, user.name);
-    setLastActionDevice(device.deviceId);
+    // Store the selected device and open QR scanner
+    setSelectedDevice(device);
+    setQrScanMode('pickup');
+    setQrError('');
     setIsPickupDialogOpen(false);
-    setShowPickupSuccess(true);
+    setIsQRScannerOpen(true);
   };
 
-  const handleReturn = (device: Device) => {
+  const handleReturnClick = (device: Device) => {
     if (!user) return;
     
-    returnDevice(device.id, user.id, user.name);
-    setLastActionDevice(device.deviceId);
+    // Store the selected device and open QR scanner
+    setSelectedDevice(device);
+    setQrScanMode('return');
+    setQrError('');
     setIsReturnDialogOpen(false);
-    setShowReturnSuccess(true);
+    setIsQRScannerOpen(true);
+  };
+
+  const handleQRScan = async (scannedCode: string) => {
+    if (!selectedDevice || !user) return;
+
+    setIsVerifyingQR(true);
+    setQrError('');
+
+    try {
+      // Fetch active QR code from backend
+      const activeQRCode = await qrCodeAPI.getActive(qrScanMode);
+      
+      // Verify the scanned code matches the active QR code
+      if (activeQRCode.code !== scannedCode) {
+        setQrError('Invalid QR code. Please scan the correct QR code for ' + qrScanMode + '.');
+        setIsVerifyingQR(false);
+        return;
+      }
+
+      // Check if QR code is still valid
+      if (activeQRCode.validUntil) {
+        const validUntil = new Date(activeQRCode.validUntil);
+        if (validUntil < new Date()) {
+          setQrError('QR code has expired. Please contact admin for a new code.');
+          setIsVerifyingQR(false);
+          return;
+        }
+      }
+
+      // QR code is valid, proceed with action
+      if (qrScanMode === 'pickup') {
+        pickupDevice(selectedDevice.id, user.id, user.name);
+        setLastActionDevice(selectedDevice.deviceId);
+        setShowPickupSuccess(true);
+      } else {
+        returnDevice(selectedDevice.id, user.id, user.name);
+        setLastActionDevice(selectedDevice.deviceId);
+        setShowReturnSuccess(true);
+      }
+
+      setIsQRScannerOpen(false);
+      setSelectedDevice(null);
+    } catch (error: any) {
+      setQrError(error.message || 'Failed to verify QR code. Please try again.');
+    } finally {
+      setIsVerifyingQR(false);
+    }
   };
 
   const handleRefresh = async () => {
@@ -459,18 +518,18 @@ export default function TeacherDashboard() {
               <ArrowUp className="w-5 h-5 text-primary" />
               Pick Up Device
             </DialogTitle>
+            <DialogDescription>
+              Select a device to pick up. You'll need to scan a QR code for authorization.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-4">
-            <p className="text-muted-foreground">
-              Select a device to pick up from the station:
-            </p>
             <div className="grid grid-cols-2 gap-3 max-h-[300px] overflow-y-auto">
               {availableDevices.map((device) => (
                 <motion.button
                   key={device.id}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => handlePickup(device)}
+                  onClick={() => handlePickupClick(device)}
                   className="p-4 rounded-lg border border-border hover:border-primary hover:bg-primary/5 transition-all text-left"
                 >
                   <div className="flex items-center gap-3">
@@ -497,18 +556,18 @@ export default function TeacherDashboard() {
               <ArrowDown className="w-5 h-5 text-secondary" />
               Return Device
             </DialogTitle>
+            <DialogDescription>
+              Select the device you want to return. You'll need to scan a QR code for authorization.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-4">
-            <p className="text-muted-foreground">
-              Select the device you want to return:
-            </p>
             <div className="grid grid-cols-2 gap-3">
               {myDevices.map((device) => (
                 <motion.button
                   key={device.id}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => handleReturn(device)}
+                  onClick={() => handleReturnClick(device)}
                   className="p-4 rounded-lg border border-border hover:border-secondary hover:bg-secondary/5 transition-all text-left"
                 >
                   <div className="flex items-center gap-3">
@@ -522,6 +581,55 @@ export default function TeacherDashboard() {
                   </div>
                 </motion.button>
               ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* QR Scanner Modal */}
+      <QRScanner
+        isOpen={isQRScannerOpen}
+        onClose={() => {
+          setIsQRScannerOpen(false);
+          setSelectedDevice(null);
+          setQrError('');
+        }}
+        onScan={handleQRScan}
+        title={qrScanMode === 'pickup' ? 'Scan QR Code for Pickup' : 'Scan QR Code for Return'}
+      />
+
+      {/* QR Error Dialog */}
+      <Dialog open={!!qrError} onOpenChange={(open) => !open && setQrError('')}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="w-5 h-5" />
+              Authorization Failed
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <p className="text-muted-foreground">{qrError}</p>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setQrError('');
+                  setIsQRScannerOpen(false);
+                  setSelectedDevice(null);
+                }}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  setQrError('');
+                  setIsQRScannerOpen(true);
+                }}
+                className="flex-1"
+              >
+                Try Again
+              </Button>
             </div>
           </div>
         </DialogContent>
