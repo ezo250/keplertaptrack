@@ -99,16 +99,34 @@ export default function TeacherDashboard() {
   const handleQRScan = async (scannedCode: string) => {
     if (!selectedDevice || !user) return;
 
+    // Immediately close scanner and show feedback for instant response
+    setIsQRScannerOpen(false);
     setIsVerifyingQR(true);
     setQrError('');
 
+    // Store device info for success modal
+    const deviceId = selectedDevice.deviceId;
+    const deviceDbId = selectedDevice.id;
+    const mode = qrScanMode;
+    
+    // Clear selected device immediately
+    setSelectedDevice(null);
+
     try {
-      // Fetch active QR code from backend
-      const activeQRCode = await qrCodeAPI.getActive(qrScanMode);
+      // Add timeout to API call - fail fast if taking too long
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout')), 5000)
+      );
+
+      // Fetch active QR code from backend with timeout
+      const activeQRCode = await Promise.race([
+        qrCodeAPI.getActive(mode),
+        timeoutPromise
+      ]) as any;
       
       // Verify the scanned code matches the active QR code
       if (activeQRCode.code !== scannedCode) {
-        setQrError('Invalid QR code. Please scan the correct QR code for ' + qrScanMode + '.');
+        setQrError('Invalid QR code. Please scan the correct QR code for ' + mode + '.');
         setIsVerifyingQR(false);
         return;
       }
@@ -124,22 +142,27 @@ export default function TeacherDashboard() {
       }
 
       // QR code is valid, proceed with action
-      if (qrScanMode === 'pickup') {
-        pickupDevice(selectedDevice.id, user.id, user.name);
-        setLastActionDevice(selectedDevice.deviceId);
+      // Execute pickup/return immediately without waiting
+      if (mode === 'pickup') {
+        pickupDevice(deviceDbId, user.id, user.name);
+        setLastActionDevice(deviceId);
+        setIsVerifyingQR(false);
         setShowPickupSuccess(true);
       } else {
-        returnDevice(selectedDevice.id, user.id, user.name);
-        setLastActionDevice(selectedDevice.deviceId);
+        returnDevice(deviceDbId, user.id, user.name);
+        setLastActionDevice(deviceId);
+        setIsVerifyingQR(false);
         setShowReturnSuccess(true);
       }
-
-      setIsQRScannerOpen(false);
-      setSelectedDevice(null);
     } catch (error: any) {
-      setQrError(error.message || 'Failed to verify QR code. Please try again.');
-    } finally {
+      console.error('QR verification error:', error);
       setIsVerifyingQR(false);
+      
+      if (error.message === 'Request timeout') {
+        setQrError('Request timeout. Please check your connection and try again.');
+      } else {
+        setQrError(error.message || 'Failed to verify QR code. Please try again.');
+      }
     }
   };
 
@@ -597,6 +620,31 @@ export default function TeacherDashboard() {
         onScan={handleQRScan}
         title={qrScanMode === 'pickup' ? 'Scan QR Code for Pickup' : 'Scan QR Code for Return'}
       />
+
+      {/* Verifying QR Dialog */}
+      <Dialog open={isVerifyingQR} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RefreshCw className="w-5 h-5 animate-spin text-primary" />
+              Verifying Authorization...
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <QrCode className="w-8 h-8 text-primary animate-pulse" />
+              </div>
+              <p className="text-center text-muted-foreground">
+                Processing your request...
+              </p>
+              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: '70%' }} />
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* QR Error Dialog */}
       <Dialog open={!!qrError} onOpenChange={(open) => !open && setQrError('')}>

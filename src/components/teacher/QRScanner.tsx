@@ -129,8 +129,14 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
           if (result && result.getText()) {
             // Success - QR code detected
             console.log('QR Code detected:', result.getText());
-            onScan(result.getText());
+            
+            // Stop scanning immediately for instant feedback
             stopScanning();
+            
+            // Call onScan callback (don't wait for it)
+            onScan(result.getText());
+            
+            // Close scanner immediately
             onClose();
             return;
           }
