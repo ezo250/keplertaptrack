@@ -1,8 +1,8 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Camera, X, AlertCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Camera, X, AlertCircle, ScanLine } from 'lucide-react';
 
 interface QRScannerProps {
   isOpen: boolean;
@@ -14,6 +14,7 @@ interface QRScannerProps {
 export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [isCameraReady, setIsCameraReady] = useState(false);
   const [error, setError] = useState<string>('');
   const [cameraPermission, setCameraPermission] = useState<'granted' | 'denied' | 'prompt'>('prompt');
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -23,7 +24,7 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
 
   useEffect(() => {
     if (isOpen) {
-      initializeScanner();
+      initializeCamera();
     }
 
     return () => {
@@ -31,7 +32,7 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
     };
   }, [isOpen]);
 
-  const initializeScanner = async () => {
+  const initializeCamera = async () => {
     if (!readerRef.current) {
       readerRef.current = new BrowserMultiFormatReader();
     }
@@ -48,15 +49,15 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
       console.log('Permission API not supported');
     }
 
-    startScanning();
+    await startCamera();
   };
 
-  const startScanning = async () => {
-    if (!videoRef.current || scanningRef.current) return;
+  const startCamera = async () => {
+    if (!videoRef.current) return;
 
     try {
-      setIsScanning(true);
       setError('');
+      setIsCameraReady(false);
 
       // Stop any existing stream
       if (streamRef.current) {
@@ -87,15 +88,16 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
           }
         });
 
-        await videoRef.current.play();
+        // Check if video is already playing before calling play()
+        if (videoRef.current.paused) {
+          await videoRef.current.play();
+        }
+        
         setCameraPermission('granted');
+        setIsCameraReady(true);
         
-        // Wait a bit more for video to stabilize
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Start continuous scanning with interval
-        scanningRef.current = true;
-        scanContinuously();
+        // Wait a bit for video to stabilize
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
     } catch (err: any) {
       console.error('Camera access error:', err);
@@ -110,9 +112,15 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
       } else {
         setError('Failed to access camera. Please try again.');
       }
-      setIsScanning(false);
-      scanningRef.current = false;
     }
+  };
+
+  const startScanning = () => {
+    if (!videoRef.current || scanningRef.current || !isCameraReady) return;
+    
+    setIsScanning(true);
+    scanningRef.current = true;
+    scanContinuously();
   };
 
   const scanContinuously = () => {
@@ -196,7 +204,8 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
   const handleRetry = () => {
     setError('');
     setCameraPermission('prompt');
-    startScanning();
+    setIsCameraReady(false);
+    startCamera();
   };
 
   return (
@@ -207,6 +216,9 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
             <Camera className="w-5 h-5 sm:w-6 sm:h-6" />
             {title}
           </DialogTitle>
+          <DialogDescription className="text-sm sm:text-xs text-muted-foreground">
+            Position the QR code in the camera view and press the scan button
+          </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-3 sm:space-y-4">
@@ -235,8 +247,23 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
               </div>
             )}
 
+            {/* Camera Ready overlay - show viewfinder without scanning */}
+            {isCameraReady && !isScanning && !error && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="relative">
+                  {/* Viewfinder frame */}
+                  <div className="w-56 h-56 sm:w-64 sm:h-64 border-2 border-white/50 rounded-lg" />
+                  {/* Corner guides */}
+                  <div className="absolute top-0 left-0 w-8 h-8 border-t-[4px] border-l-[4px] border-white rounded-tl" />
+                  <div className="absolute top-0 right-0 w-8 h-8 border-t-[4px] border-r-[4px] border-white rounded-tr" />
+                  <div className="absolute bottom-0 left-0 w-8 h-8 border-b-[4px] border-l-[4px] border-white rounded-bl" />
+                  <div className="absolute bottom-0 right-0 w-8 h-8 border-b-[4px] border-r-[4px] border-white rounded-br" />
+                </div>
+              </div>
+            )}
+
             {/* Loading state */}
-            {!isScanning && !error && (
+            {!isCameraReady && !error && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/50">
                 <div className="text-white text-center px-4">
                   <Camera className="w-16 h-16 sm:w-12 sm:h-12 mx-auto mb-3 sm:mb-2 opacity-50 animate-pulse" />
@@ -257,13 +284,24 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
           </div>
 
           {/* Instructions - More prominent on mobile */}
-          {isScanning && !error && (
+          {isCameraReady && !isScanning && !error && (
             <div className="p-4 sm:p-3 bg-primary/10 border-2 sm:border border-primary/20 rounded-lg">
               <p className="text-base sm:text-sm text-center text-primary font-semibold sm:font-medium">
                 📱 Position QR code within the frame
               </p>
               <p className="text-sm sm:text-xs text-center text-primary/80 mt-1">
-                Scanning automatically...
+                Press "Scan QR Code" button when ready
+              </p>
+            </div>
+          )}
+
+          {isScanning && !error && (
+            <div className="p-4 sm:p-3 bg-primary/10 border-2 sm:border border-primary/20 rounded-lg">
+              <p className="text-base sm:text-sm text-center text-primary font-semibold sm:font-medium">
+                🔍 Scanning in progress...
+              </p>
+              <p className="text-sm sm:text-xs text-center text-primary/80 mt-1">
+                Hold steady
               </p>
             </div>
           )}
@@ -278,24 +316,38 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
           )}
 
           {/* Action buttons - Larger touch targets on mobile */}
-          <div className="flex gap-3 sm:gap-2 pt-2">
-            <Button 
-              variant="outline" 
-              onClick={handleClose} 
-              className="flex-1 h-12 sm:h-10 text-base sm:text-sm font-semibold"
-            >
-              <X className="w-5 h-5 sm:w-4 sm:h-4 mr-2" />
-              Cancel
-            </Button>
-            {error && (
+          <div className="flex flex-col gap-3 sm:gap-2 pt-2">
+            {/* Scan button - only show when camera is ready and not scanning */}
+            {isCameraReady && !isScanning && !error && (
               <Button 
-                onClick={handleRetry} 
-                className="flex-1 h-12 sm:h-10 text-base sm:text-sm font-semibold"
+                onClick={startScanning} 
+                className="w-full h-14 sm:h-12 text-base sm:text-sm font-bold"
+                size="lg"
               >
-                <Camera className="w-5 h-5 sm:w-4 sm:h-4 mr-2" />
-                Retry
+                <ScanLine className="w-6 h-6 sm:w-5 sm:h-5 mr-2" />
+                Scan QR Code
               </Button>
             )}
+
+            <div className="flex gap-3 sm:gap-2">
+              <Button 
+                variant="outline" 
+                onClick={handleClose} 
+                className="flex-1 h-12 sm:h-10 text-base sm:text-sm font-semibold"
+              >
+                <X className="w-5 h-5 sm:w-4 sm:h-4 mr-2" />
+                Cancel
+              </Button>
+              {error && (
+                <Button 
+                  onClick={handleRetry} 
+                  className="flex-1 h-12 sm:h-10 text-base sm:text-sm font-semibold"
+                >
+                  <Camera className="w-5 h-5 sm:w-4 sm:h-4 mr-2" />
+                  Retry
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </DialogContent>
