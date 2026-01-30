@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Camera, X, CheckCircle } from 'lucide-react';
+import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
 
 interface QRScannerProps {
   isOpen: boolean;
@@ -17,7 +18,7 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
   const [error, setError] = useState<string>('');
   const [scanned, setScanned] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -35,20 +36,23 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
     try {
       setError('');
       setScanned(false);
-      
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          facingMode: 'environment',
-          width: { ideal: 640 },
-          height: { ideal: 480 }
-        }
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
       });
-      
+
       streamRef.current = stream;
-      
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.setAttribute('playsinline', 'true');
         videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play().catch(() => {});
           setIsScanning(true);
           startScanning();
         };
@@ -60,20 +64,28 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
   };
 
   const startScanning = () => {
-    // For demo purposes, we'll simulate QR detection
-    // In a real app, you'd use a proper QR detection library here
-    intervalRef.current = setInterval(() => {
-      if (scanned) return;
-      
-      // Simulate QR code detection after 3 seconds
-      setTimeout(() => {
-        if (!scanned && isScanning) {
-          // Simulate scanning a pickup QR code
-          const mockQRData = 'PICKUP_AUTH_' + Date.now();
-          handleQRDetected(mockQRData);
+    if (!videoRef.current) return;
+
+    // Initialize ZXing reader if not present
+    if (!readerRef.current) {
+      readerRef.current = new BrowserMultiFormatReader();
+    }
+
+    // Use decodeFromVideoDevice to bind directly to the video element
+    readerRef.current
+      .decodeFromVideoDevice(undefined, videoRef.current, (result, err) => {
+        if (scanned) return; // prevent multiple
+        if (result) {
+          handleQRDetected(result.getText());
+        } else if (err && !(err instanceof NotFoundException)) {
+          // Non-not-found errors can be shown once
+          console.error('QR scan error:', err);
         }
-      }, 3000);
-    }, 100);
+      })
+      .catch((e) => {
+        console.error('Failed to start decoding:', e);
+        setError('Could not start QR scanner.');
+      });
   };
 
   const handleQRDetected = (qrData: string) => {
@@ -91,20 +103,22 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
 
   const stopCamera = () => {
     try {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
+      if (readerRef.current) {
+        try {
+          readerRef.current.reset();
+        } catch {}
+        readerRef.current = null;
       }
-      
+
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
       }
-      
+
       if (videoRef.current) {
         videoRef.current.srcObject = null;
       }
-      
+
       setIsScanning(false);
       setScanned(false);
     } catch (err) {
@@ -117,13 +131,7 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
     onClose();
   };
 
-  // Manual QR input for testing
-  const handleManualInput = () => {
-    const qrData = prompt('Enter QR code data for testing:');
-    if (qrData) {
-      handleQRDetected(qrData);
-    }
-  };
+  // Manual input removed per requirements
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -196,9 +204,6 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
             <Button variant="outline" onClick={handleClose} className="flex-1 gap-2">
               <X className="w-4 h-4" />
               Close
-            </Button>
-            <Button variant="secondary" onClick={handleManualInput} className="flex-1 gap-2">
-              Manual Input
             </Button>
           </div>
         </div>
