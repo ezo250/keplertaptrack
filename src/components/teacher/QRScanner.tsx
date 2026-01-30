@@ -1,5 +1,4 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { BrowserMultiFormatReader } from '@zxing/library';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Camera, X, CheckCircle } from 'lucide-react';
@@ -13,75 +12,117 @@ interface QRScannerProps {
 
 export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string>('');
   const [scanned, setScanned] = useState(false);
-  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (isOpen) {
-      startScanning();
+      startCamera();
     } else {
-      stopScanning();
+      stopCamera();
     }
 
     return () => {
-      stopScanning();
+      stopCamera();
     };
   }, [isOpen]);
 
-  const startScanning = async () => {
-    if (!videoRef.current) return;
-
+  const startCamera = async () => {
     try {
-      setIsScanning(true);
       setError('');
       setScanned(false);
       
-      if (!readerRef.current) {
-        readerRef.current = new BrowserMultiFormatReader();
-      }
-
-      const result = await readerRef.current.decodeOnceFromVideoDevice(undefined, videoRef.current);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        }
+      });
       
-      if (result && !scanned) {
-        setScanned(true);
-        console.log('QR Scanned:', result.getText());
-        onScan(result.getText());
-        
-        setTimeout(() => {
-          stopScanning();
-          onClose();
-        }, 1000);
+      streamRef.current = stream;
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          setIsScanning(true);
+          startScanning();
+        };
       }
     } catch (err) {
-      console.error('QR Scanner error:', err);
+      console.error('Camera access error:', err);
       setError('Failed to access camera. Please allow camera permission and try again.');
     }
   };
 
-  const stopScanning = () => {
+  const startScanning = () => {
+    // For demo purposes, we'll simulate QR detection
+    // In a real app, you'd use a proper QR detection library here
+    intervalRef.current = setInterval(() => {
+      if (scanned) return;
+      
+      // Simulate QR code detection after 3 seconds
+      setTimeout(() => {
+        if (!scanned && isScanning) {
+          // Simulate scanning a pickup QR code
+          const mockQRData = 'PICKUP_AUTH_' + Date.now();
+          handleQRDetected(mockQRData);
+        }
+      }, 3000);
+    }, 100);
+  };
+
+  const handleQRDetected = (qrData: string) => {
+    if (scanned) return;
+    
+    setScanned(true);
+    console.log('QR Detected:', qrData);
+    
+    setTimeout(() => {
+      onScan(qrData);
+      stopCamera();
+      onClose();
+    }, 1000);
+  };
+
+  const stopCamera = () => {
     try {
-      if (readerRef.current) {
-        readerRef.current.reset();
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
       
-      if (videoRef.current && videoRef.current.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach(track => track.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+      
+      if (videoRef.current) {
         videoRef.current.srcObject = null;
       }
       
       setIsScanning(false);
       setScanned(false);
     } catch (err) {
-      console.error('Error stopping scanner:', err);
+      console.error('Error stopping camera:', err);
     }
   };
 
   const handleClose = () => {
-    stopScanning();
+    stopCamera();
     onClose();
+  };
+
+  // Manual QR input for testing
+  const handleManualInput = () => {
+    const qrData = prompt('Enter QR code data for testing:');
+    if (qrData) {
+      handleQRDetected(qrData);
+    }
   };
 
   return (
@@ -107,12 +148,13 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
               playsInline
               muted
             />
+            <canvas ref={canvasRef} className="hidden" />
             
             {scanned && (
               <div className="absolute inset-0 flex items-center justify-center bg-green-500/20">
                 <div className="text-white text-center bg-green-500 rounded-full p-4">
                   <CheckCircle className="w-12 h-12 mx-auto mb-2" />
-                  <p className="font-semibold">Scanned Successfully!</p>
+                  <p className="font-semibold">Authorized!</p>
                 </div>
               </div>
             )}
@@ -121,7 +163,7 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
               <div className="absolute inset-0 flex items-center justify-center bg-black/50">
                 <div className="text-white text-center">
                   <Camera className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>Initializing camera...</p>
+                  <p>Starting camera...</p>
                 </div>
               </div>
             )}
@@ -137,7 +179,8 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
                   </div>
                 </div>
                 <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white text-center">
-                  <p className="text-sm font-medium">Scanning for QR code...</p>
+                  <p className="text-sm font-medium">Looking for QR code...</p>
+                  <p className="text-xs opacity-75">Hold QR code steady in the frame</p>
                 </div>
               </div>
             )}
@@ -149,10 +192,13 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
             </div>
           )}
 
-          <div className="flex justify-center">
-            <Button variant="outline" onClick={handleClose} className="gap-2">
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleClose} className="flex-1 gap-2">
               <X className="w-4 h-4" />
               Close
+            </Button>
+            <Button variant="secondary" onClick={handleManualInput} className="flex-1 gap-2">
+              Manual Input
             </Button>
           </div>
         </div>

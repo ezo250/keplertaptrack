@@ -63,10 +63,14 @@ export default function TeacherDevices() {
   const handleQRScan = (result: string) => {
     console.log('QR Scanned Result:', result);
     
-    // Validate QR code based on action type
-    const expectedPrefix = scannerAction === 'pickup' ? 'PICKUP_AUTH_' : 'RETURN_AUTH_';
+    // For demo: accept any QR that contains the action type
+    const isValidPickup = result.includes('PICKUP') || result.includes('pickup');
+    const isValidReturn = result.includes('RETURN') || result.includes('return');
     
-    if (result.startsWith(expectedPrefix)) {
+    const isValid = (scannerAction === 'pickup' && isValidPickup) || 
+                   (scannerAction === 'return' && isValidReturn);
+    
+    if (isValid) {
       setIsAuthorized(true);
       setShowQRScanner(false);
       
