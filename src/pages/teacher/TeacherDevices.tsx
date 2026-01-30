@@ -5,7 +5,7 @@ import { useData } from '@/contexts/DataContext';
 import Header from '@/components/layout/Header';
 import DeviceCard from '@/components/dashboard/DeviceCard';
 import PickupSuccessModal from '@/components/modals/PickupSuccessModal';
-import ReturnSuccessModal from '@/components/modals/ReturnSuccessModal';
+import QRScanner from '@/components/teacher/QRScanner';
 import DeviceRestrictionModal from '@/components/modals/DeviceRestrictionModal';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Tablet, ArrowUp, ArrowDown } from 'lucide-react';
+import { Tablet, ArrowUp, ArrowDown, QrCode } from 'lucide-react';
 import { Device } from '@/types';
 
 export default function TeacherDevices() {
@@ -33,6 +33,9 @@ export default function TeacherDevices() {
   const [showReturnSuccess, setShowReturnSuccess] = useState(false);
   const [showRestrictionModal, setShowRestrictionModal] = useState(false);
   const [lastActionDevice, setLastActionDevice] = useState('');
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [scannerAction, setScannerAction] = useState<'pickup' | 'return'>('pickup');
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
   const availableDevices = getAvailableDevices();
   const devicesInUse = getDevicesInUse();
@@ -40,6 +43,14 @@ export default function TeacherDevices() {
 
   const handlePickup = (device: Device) => {
     if (!user) return;
+    
+    // Check if authorized first
+    if (!isAuthorized) {
+      setSelectedDevice(device);
+      setScannerAction('pickup');
+      setShowQRScanner(true);
+      return;
+    }
     
     // Prevent picking up if teacher already has a device
     if (myDevices.length > 0) {
@@ -51,15 +62,47 @@ export default function TeacherDevices() {
     pickupDevice(device.id, user.id, user.name);
     setLastActionDevice(device.deviceId);
     setSelectedDevice(null);
+    setIsAuthorized(false); // Reset authorization
     setShowPickupSuccess(true);
   };
 
   const handleReturn = (device: Device) => {
     if (!user) return;
+    
+    // Check if authorized first
+    if (!isAuthorized) {
+      setSelectedDevice(device);
+      setScannerAction('return');
+      setShowQRScanner(true);
+      return;
+    }
+    
     returnDevice(device.id, user.id, user.name);
     setLastActionDevice(device.deviceId);
     setSelectedDevice(null);
+    setIsAuthorized(false); // Reset authorization
     setShowReturnSuccess(true);
+  };
+
+  const handleQRScan = (result: string) => {
+    // Validate QR code based on action type
+    const expectedPrefix = scannerAction === 'pickup' ? 'PICKUP_AUTH_' : 'RETURN_AUTH_';
+    
+    if (result.startsWith(expectedPrefix)) {
+      setIsAuthorized(true);
+      setShowQRScanner(false);
+      
+      // Proceed with the action
+      if (selectedDevice) {
+        if (scannerAction === 'pickup') {
+          handlePickup(selectedDevice);
+        } else {
+          handleReturn(selectedDevice);
+        }
+      }
+    } else {
+      alert(`Invalid QR code. Please scan the correct ${scannerAction} authorization code.`);
+    }
   };
 
   return (
@@ -100,8 +143,8 @@ export default function TeacherDevices() {
                     variant="default"
                     size="sm"
                   >
-                    <ArrowDown className="w-4 h-4" />
-                    Return
+                    <QrCode className="w-4 h-4" />
+                    Scan to Return
                   </Button>
                 </motion.div>
               ))}
@@ -222,8 +265,8 @@ export default function TeacherDevices() {
                 Cancel
               </Button>
               <Button onClick={() => selectedDevice && handlePickup(selectedDevice)}>
-                <ArrowUp className="w-4 h-4 mr-2" />
-                Pick Up
+                <QrCode className="w-4 h-4 mr-2" />
+                Scan to Pick Up
               </Button>
             </div>
           </div>
@@ -241,6 +284,18 @@ export default function TeacherDevices() {
         isOpen={showReturnSuccess}
         onClose={() => setShowReturnSuccess(false)}
         deviceId={lastActionDevice}
+      />
+      
+      {/* QR Scanner */}
+      <QRScanner
+        isOpen={showQRScanner}
+        onClose={() => {
+          setShowQRScanner(false);
+          setSelectedDevice(null);
+          setIsAuthorized(false);
+        }}
+        onScan={handleQRScan}
+        title={`Scan ${scannerAction === 'pickup' ? 'Pickup' : 'Return'} Authorization`}
       />
       
       {/* Restriction Modal */}

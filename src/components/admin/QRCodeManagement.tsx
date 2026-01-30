@@ -39,7 +39,7 @@ export default function QRCodeManagement({ onGenerateQRCode }: QRCodeManagementP
   // Generate a mock QR code value (in real app, this would come from backend)
   const generateQRCodeValue = (type: QRType) => {
     const timestamp = new Date().getTime();
-    return `KEPLER_${type.toUpperCase()}_${timestamp}_${Math.random().toString(36).substr(2, 9)}`;
+    return `${type.toUpperCase()}_AUTH_${timestamp}_${Math.random().toString(36).substr(2, 9)}`;
   };
 
   const handleGenerateQRCode = async () => {
