@@ -21,6 +21,9 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
   const rafRef = useRef<number | null>(null);
   const lastDecodeRef = useRef<number>(0);
+  const detectorRef = useRef<any>(null);
+  const canUseBarcodeDetectorRef = useRef<boolean>(false);
+  const decodeBusyRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -42,8 +45,9 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          aspectRatio: { ideal: 1.7777777778 }
         },
         audio: false
       });
@@ -68,29 +72,65 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
   const startScanning = () => {
     if (!videoRef.current) return;
 
+    // Initialize ZXing reader if not present
     if (!readerRef.current) {
       readerRef.current = new BrowserMultiFormatReader();
+    }
+
+    // Initialize BarcodeDetector (if supported)
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const BD: any = (window as any).BarcodeDetector;
+      if (BD) {
+        detectorRef.current = new BD({ formats: ['qr_code'] });
+        canUseBarcodeDetectorRef.current = true;
+      }
+    } catch {
+      canUseBarcodeDetectorRef.current = false;
     }
 
     const loop = () => {
       if (scanned) return;
       const now = performance.now();
-      // Throttle decoding attempts to every 250ms to avoid flicker
-      if (now - lastDecodeRef.current >= 250 && videoRef.current && canvasRef.current) {
-        try {
-          const video = videoRef.current;
-          const canvas = canvasRef.current;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            const vw = video.videoWidth;
-            const vh = video.videoHeight;
-            if (vw && vh) {
-              // Set canvas to video size
-              canvas.width = vw;
-              canvas.height = vh;
-              // Draw current frame
-              ctx.drawImage(video, 0, 0, vw, vh);
-              lastDecodeRef.current = now;
+      // Throttle decoding attempts to every 150ms to improve mobile performance
+      if (
+        !decodeBusyRef.current &&
+        now - lastDecodeRef.current >= 150 &&
+        videoRef.current &&
+        canvasRef.current
+      ) {
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        if (ctx && vw && vh) {
+          // Downscale for faster decode: target ~480px width, keep aspect ratio
+          const targetW = Math.min(480, vw);
+          const targetH = Math.round((targetW / vw) * vh);
+          canvas.width = targetW;
+          canvas.height = targetH;
+
+          // Draw center-cropped video into smaller canvas
+          const srcAspect = vw / vh;
+          const dstAspect = targetW / targetH;
+          let sx = 0, sy = 0, sw = vw, sh = vh;
+          if (srcAspect > dstAspect) {
+            // source wider than destination: crop width
+            sw = Math.round(vh * dstAspect);
+            sx = Math.round((vw - sw) / 2);
+          } else if (srcAspect < dstAspect) {
+            // source taller than destination: crop height
+            sh = Math.round(vw / dstAspect);
+            sy = Math.round((vh - sh) / 2);
+          }
+          ctx.drawImage(video, sx, sy, sw, sh, 0, 0, targetW, targetH);
+
+          lastDecodeRef.current = now;
+          decodeBusyRef.current = true;
+
+          const doZXing = () => {
+            try {
               const dataUrl = canvas.toDataURL('image/png');
               const img = new Image();
               img.onload = async () => {
@@ -98,22 +138,41 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
                   const result = await readerRef.current!.decodeFromImage(img as HTMLImageElement);
                   if (result && !scanned) {
                     handleQRDetected(result.getText());
+                    decodeBusyRef.current = false;
                     return;
                   }
                 } catch (e) {
-                  if (e && !(e instanceof NotFoundException)) {
-                    // Ignore not found; log others once in a while
-                    // console.error('QR decode error:', e);
-                  }
+                  // ignore not found
                 }
+                decodeBusyRef.current = false;
               };
               img.src = dataUrl;
+            } catch {
+              decodeBusyRef.current = false;
             }
+          };
+
+          if (canUseBarcodeDetectorRef.current && detectorRef.current) {
+            detectorRef.current
+              .detect(canvas)
+              .then((codes: any[]) => {
+                if (scanned) return;
+                const code = codes?.[0]?.rawValue;
+                if (code) {
+                  handleQRDetected(code);
+                }
+                decodeBusyRef.current = false;
+              })
+              .catch(() => {
+                // Fallback to ZXing on detector failure
+                doZXing();
+              });
+          } else {
+            doZXing();
           }
-        } catch (e) {
-          // Swallow frame errors to keep loop alive
         }
       }
+
       rafRef.current = requestAnimationFrame(loop);
     };
 
@@ -156,6 +215,7 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
         videoRef.current.srcObject = null;
       }
 
+      decodeBusyRef.current = false;
       setIsScanning(false);
       setScanned(false);
     } catch (err) {
