@@ -185,32 +185,31 @@ export default function TeacherDashboard() {
         subtitle="Manage your attendance devices here"
       />
       
-      {/* Quick Settings Bar */}
+      {/* Quick Settings Bar - Mobile Optimized */}
       <div className="px-4 sm:px-6 pt-6">
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex justify-between items-center"
+          className="flex justify-between items-center gap-3"
         >
           <Button
             onClick={handleRefresh}
             disabled={isRefreshing}
             variant="outline"
-            size="sm"
-            className="gap-2"
+            className="gap-2 h-11 sm:h-9 px-4 sm:px-3 text-sm sm:text-sm flex-1 sm:flex-none"
           >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Refresh</span>
+            <RefreshCw className={`w-5 h-5 sm:w-4 sm:h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span className="sm:inline">Refresh</span>
           </Button>
           
           <Button
             variant="outline"
-            size="sm"
             onClick={() => setShowChangePassword(true)}
-            className="gap-2"
+            className="gap-2 h-11 sm:h-9 px-4 sm:px-3 text-sm sm:text-sm flex-1 sm:flex-none"
           >
-            <Key className="w-4 h-4" />
-            <span className="hidden sm:inline">Change Password</span>
+            <Key className="w-5 h-5 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Password</span>
+            <span className="sm:hidden">Change Password</span>
           </Button>
         </motion.div>
       </div>
@@ -233,22 +232,22 @@ export default function TeacherDashboard() {
               }
             }}
             disabled={myDevices.length > 0}
-            className={`relative p-4 sm:p-6 rounded-xl overflow-hidden group ${
+            className={`relative p-6 sm:p-6 min-h-[120px] sm:min-h-0 rounded-xl overflow-hidden group ${
               myDevices.length > 0
                 ? 'bg-muted text-muted-foreground cursor-not-allowed opacity-60'
-                : 'bg-gradient-to-br from-primary to-primary/80 text-white'
+                : 'bg-gradient-to-br from-primary to-primary/80 text-white active:scale-95'
             }`}
           >
             <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="absolute -right-8 -bottom-8 w-32 h-32 rounded-full bg-white/5 blur-2xl" />
             
-            <div className="relative flex items-center gap-3 sm:gap-4">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-white/20 flex items-center justify-center">
-                <ArrowUp className="w-6 h-6 sm:w-7 sm:h-7" />
+            <div className="relative flex items-center gap-4 sm:gap-4">
+              <div className="w-16 h-16 sm:w-14 sm:h-14 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                <ArrowUp className="w-8 h-8 sm:w-7 sm:h-7" />
               </div>
               <div className="text-left">
-                <h3 className="text-lg sm:text-xl font-heading font-bold">Pick Up Device</h3>
-                <p className={`text-sm sm:text-base ${
+                <h3 className="text-xl sm:text-xl font-heading font-bold">Pick Up Device</h3>
+                <p className={`text-base sm:text-base mt-1 ${
                   myDevices.length > 0 ? 'text-muted-foreground' : 'text-white/80'
                 }`}>
                   {myDevices.length > 0 
@@ -264,22 +263,22 @@ export default function TeacherDashboard() {
             whileTap={{ scale: 0.98 }}
             onClick={() => setIsReturnDialogOpen(true)}
             disabled={myDevices.length === 0}
-            className={`relative p-4 sm:p-6 rounded-xl overflow-hidden group ${
+            className={`relative p-6 sm:p-6 min-h-[120px] sm:min-h-0 rounded-xl overflow-hidden group ${
               myDevices.length > 0
-                ? 'bg-gradient-to-br from-secondary to-secondary/80 text-white'
+                ? 'bg-gradient-to-br from-secondary to-secondary/80 text-white active:scale-95'
                 : 'bg-muted text-muted-foreground cursor-not-allowed'
             }`}
           >
             <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="absolute -right-8 -bottom-8 w-32 h-32 rounded-full bg-white/5 blur-2xl" />
             
-            <div className="relative flex items-center gap-3 sm:gap-4">
-              <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl ${myDevices.length > 0 ? 'bg-white/20' : 'bg-muted-foreground/10'} flex items-center justify-center`}>
-                <ArrowDown className="w-6 h-6 sm:w-7 sm:h-7" />
+            <div className="relative flex items-center gap-4 sm:gap-4">
+              <div className={`w-16 h-16 sm:w-14 sm:h-14 rounded-xl ${myDevices.length > 0 ? 'bg-white/20' : 'bg-muted-foreground/10'} flex items-center justify-center flex-shrink-0`}>
+                <ArrowDown className="w-8 h-8 sm:w-7 sm:h-7" />
               </div>
               <div className="text-left">
-                <h3 className="text-lg sm:text-xl font-heading font-bold">Return Device</h3>
-                <p className={`text-sm sm:text-base ${myDevices.length > 0 ? 'text-white/80' : ''}`}>
+                <h3 className="text-xl sm:text-xl font-heading font-bold">Return Device</h3>
+                <p className={`text-base sm:text-base mt-1 ${myDevices.length > 0 ? 'text-white/80' : ''}`}>
                   {myDevices.length > 0 
                     ? `${myDevices.length} device(s) with you` 
                     : 'No devices to return'}
@@ -533,35 +532,35 @@ export default function TeacherDashboard() {
         </motion.div>
       </div>
 
-      {/* Pickup Dialog */}
+      {/* Pickup Dialog - Mobile Optimized */}
       <Dialog open={isPickupDialogOpen} onOpenChange={setIsPickupDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ArrowUp className="w-5 h-5 text-primary" />
+        <DialogContent className="max-w-[95vw] sm:max-w-lg w-full p-4 sm:p-6">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
+              <ArrowUp className="w-6 h-6 sm:w-5 sm:h-5 text-primary" />
               Pick Up Device
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-base sm:text-sm">
               Select a device to pick up. You'll need to scan a QR code for authorization.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-4">
-            <div className="grid grid-cols-2 gap-3 max-h-[300px] overflow-y-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[400px] sm:max-h-[300px] overflow-y-auto">
               {availableDevices.map((device) => (
                 <motion.button
                   key={device.id}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => handlePickupClick(device)}
-                  className="p-4 rounded-lg border border-border hover:border-primary hover:bg-primary/5 transition-all text-left"
+                  className="p-5 sm:p-4 rounded-lg border-2 sm:border border-border hover:border-primary hover:bg-primary/5 active:bg-primary/10 transition-all text-left"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <Tablet className="w-5 h-5 text-primary" />
+                  <div className="flex items-center gap-4 sm:gap-3">
+                    <div className="w-14 h-14 sm:w-10 sm:h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Tablet className="w-7 h-7 sm:w-5 sm:h-5 text-primary" />
                     </div>
                     <div>
-                      <p className="font-medium">{device.deviceId}</p>
-                      <p className="text-xs text-success">Available</p>
+                      <p className="font-semibold text-base sm:text-sm">{device.deviceId}</p>
+                      <p className="text-sm sm:text-xs text-success font-medium">Available</p>
                     </div>
                   </div>
                 </motion.button>
@@ -571,35 +570,35 @@ export default function TeacherDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Return Dialog */}
+      {/* Return Dialog - Mobile Optimized */}
       <Dialog open={isReturnDialogOpen} onOpenChange={setIsReturnDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ArrowDown className="w-5 h-5 text-secondary" />
+        <DialogContent className="max-w-[95vw] sm:max-w-lg w-full p-4 sm:p-6">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
+              <ArrowDown className="w-6 h-6 sm:w-5 sm:h-5 text-secondary" />
               Return Device
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-base sm:text-sm">
               Select the device you want to return. You'll need to scan a QR code for authorization.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {myDevices.map((device) => (
                 <motion.button
                   key={device.id}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => handleReturnClick(device)}
-                  className="p-4 rounded-lg border border-border hover:border-secondary hover:bg-secondary/5 transition-all text-left"
+                  className="p-5 sm:p-4 rounded-lg border-2 sm:border border-border hover:border-secondary hover:bg-secondary/5 active:bg-secondary/10 transition-all text-left"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
-                      <Tablet className="w-5 h-5 text-secondary" />
+                  <div className="flex items-center gap-4 sm:gap-3">
+                    <div className="w-14 h-14 sm:w-10 sm:h-10 rounded-lg bg-secondary/10 flex items-center justify-center flex-shrink-0">
+                      <Tablet className="w-7 h-7 sm:w-5 sm:h-5 text-secondary" />
                     </div>
                     <div>
-                      <p className="font-medium">{device.deviceId}</p>
-                      <p className="text-xs text-primary">With you</p>
+                      <p className="font-semibold text-base sm:text-sm">{device.deviceId}</p>
+                      <p className="text-sm sm:text-xs text-primary font-medium">With you</p>
                     </div>
                   </div>
                 </motion.button>
@@ -621,43 +620,43 @@ export default function TeacherDashboard() {
         title={qrScanMode === 'pickup' ? 'Scan QR Code for Pickup' : 'Scan QR Code for Return'}
       />
 
-      {/* Verifying QR Dialog */}
+      {/* Verifying QR Dialog - Mobile Optimized */}
       <Dialog open={isVerifyingQR} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <RefreshCw className="w-5 h-5 animate-spin text-primary" />
-              Verifying Authorization...
+        <DialogContent className="max-w-[90vw] sm:max-w-md w-full p-6 sm:p-6">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="flex items-center justify-center gap-2 text-lg sm:text-base">
+              <RefreshCw className="w-6 h-6 sm:w-5 sm:h-5 animate-spin text-primary" />
+              Verifying Authorization
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 pt-4">
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <QrCode className="w-8 h-8 text-primary animate-pulse" />
+          <div className="space-y-6 sm:space-y-4 pt-4">
+            <div className="flex flex-col items-center gap-6 sm:gap-4">
+              <div className="w-20 h-20 sm:w-16 sm:h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <QrCode className="w-10 h-10 sm:w-8 sm:h-8 text-primary animate-pulse" />
               </div>
-              <p className="text-center text-muted-foreground">
+              <p className="text-center text-muted-foreground text-base sm:text-sm font-medium">
                 Processing your request...
               </p>
-              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: '70%' }} />
+              <div className="w-full bg-muted rounded-full h-3 sm:h-2 overflow-hidden">
+                <div className="h-full bg-primary rounded-full animate-pulse transition-all" style={{ width: '70%' }} />
               </div>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* QR Error Dialog */}
+      {/* QR Error Dialog - Mobile Optimized */}
       <Dialog open={!!qrError} onOpenChange={(open) => !open && setQrError('')}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertCircle className="w-5 h-5" />
+        <DialogContent className="max-w-[95vw] sm:max-w-md w-full p-6 sm:p-6">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="flex items-center gap-2 text-destructive text-lg sm:text-base">
+              <AlertCircle className="w-6 h-6 sm:w-5 sm:h-5" />
               Authorization Failed
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 pt-4">
-            <p className="text-muted-foreground">{qrError}</p>
-            <div className="flex gap-3">
+          <div className="space-y-6 sm:space-y-4 pt-4">
+            <p className="text-muted-foreground text-base sm:text-sm">{qrError}</p>
+            <div className="flex flex-col sm:flex-row gap-3">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -665,7 +664,7 @@ export default function TeacherDashboard() {
                   setIsQRScannerOpen(false);
                   setSelectedDevice(null);
                 }}
-                className="flex-1"
+                className="flex-1 h-12 sm:h-10 text-base sm:text-sm font-semibold"
               >
                 Cancel
               </Button>
@@ -674,7 +673,7 @@ export default function TeacherDashboard() {
                   setQrError('');
                   setIsQRScannerOpen(true);
                 }}
-                className="flex-1"
+                className="flex-1 h-12 sm:h-10 text-base sm:text-sm font-semibold"
               >
                 Try Again
               </Button>

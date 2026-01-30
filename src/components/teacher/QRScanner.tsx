@@ -203,16 +203,17 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Camera className="w-5 h-5" />
+      <DialogContent className="max-w-[95vw] sm:max-w-md w-full p-4 sm:p-6">
+        <DialogHeader className="space-y-2">
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Camera className="w-5 h-5 sm:w-6 sm:h-6" />
             {title}
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-4">
-          <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
+        <div className="space-y-3 sm:space-y-4">
+          {/* Video Container - Fullscreen on mobile */}
+          <div className="relative bg-black rounded-lg overflow-hidden w-full" style={{ aspectRatio: '4/3' }}>
             <video
               ref={videoRef}
               className="w-full h-full object-cover"
@@ -221,16 +222,17 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
               muted
             />
             
-            {/* Scanning overlay */}
+            {/* Scanning overlay - Larger on mobile */}
             {isScanning && !error && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="relative">
-                  <div className="w-48 h-48 border-4 border-primary rounded-lg animate-pulse" />
-                  {/* Corner guides */}
-                  <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-white" />
-                  <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-white" />
-                  <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-white" />
-                  <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-white" />
+                  {/* Scanning frame - responsive size */}
+                  <div className="w-56 h-56 sm:w-64 sm:h-64 border-4 border-primary rounded-lg animate-pulse" />
+                  {/* Corner guides - larger and more visible */}
+                  <div className="absolute top-0 left-0 w-8 h-8 border-t-[5px] border-l-[5px] border-white rounded-tl" />
+                  <div className="absolute top-0 right-0 w-8 h-8 border-t-[5px] border-r-[5px] border-white rounded-tr" />
+                  <div className="absolute bottom-0 left-0 w-8 h-8 border-b-[5px] border-l-[5px] border-white rounded-bl" />
+                  <div className="absolute bottom-0 right-0 w-8 h-8 border-b-[5px] border-r-[5px] border-white rounded-br" />
                 </div>
               </div>
             )}
@@ -238,9 +240,9 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
             {/* Loading state */}
             {!isScanning && !error && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                <div className="text-white text-center">
-                  <Camera className="w-12 h-12 mx-auto mb-2 opacity-50 animate-pulse" />
-                  <p className="text-sm">Initializing camera...</p>
+                <div className="text-white text-center px-4">
+                  <Camera className="w-16 h-16 sm:w-12 sm:h-12 mx-auto mb-3 sm:mb-2 opacity-50 animate-pulse" />
+                  <p className="text-base sm:text-sm font-medium">Initializing camera...</p>
                 </div>
               </div>
             )}
@@ -248,41 +250,51 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
             {/* Error state */}
             {error && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                <div className="text-white text-center px-4">
-                  <AlertCircle className="w-12 h-12 mx-auto mb-2 text-destructive" />
-                  <p className="text-sm">{error}</p>
+                <div className="text-white text-center px-6 sm:px-4">
+                  <AlertCircle className="w-16 h-16 sm:w-12 sm:h-12 mx-auto mb-3 sm:mb-2 text-destructive" />
+                  <p className="text-base sm:text-sm">{error}</p>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Instructions */}
+          {/* Instructions - More prominent on mobile */}
           {isScanning && !error && (
-            <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
-              <p className="text-sm text-center text-primary font-medium">
-                📱 Position the QR code within the frame - scanning automatically...
+            <div className="p-4 sm:p-3 bg-primary/10 border-2 sm:border border-primary/20 rounded-lg">
+              <p className="text-base sm:text-sm text-center text-primary font-semibold sm:font-medium">
+                📱 Position QR code within the frame
+              </p>
+              <p className="text-sm sm:text-xs text-center text-primary/80 mt-1">
+                Scanning automatically...
               </p>
             </div>
           )}
 
           {/* Camera permission info */}
           {cameraPermission === 'denied' && (
-            <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-              <p className="text-sm text-destructive">
+            <div className="p-4 sm:p-3 bg-destructive/10 border-2 sm:border border-destructive/20 rounded-lg">
+              <p className="text-base sm:text-sm text-destructive font-medium">
                 Camera access is blocked. Please enable it in your browser settings and try again.
               </p>
             </div>
           )}
 
-          {/* Action buttons */}
-          <div className="flex justify-between gap-3">
-            <Button variant="outline" onClick={handleClose} className="flex-1">
-              <X className="w-4 h-4 mr-2" />
+          {/* Action buttons - Larger touch targets on mobile */}
+          <div className="flex gap-3 sm:gap-2 pt-2">
+            <Button 
+              variant="outline" 
+              onClick={handleClose} 
+              className="flex-1 h-12 sm:h-10 text-base sm:text-sm font-semibold"
+            >
+              <X className="w-5 h-5 sm:w-4 sm:h-4 mr-2" />
               Cancel
             </Button>
             {error && (
-              <Button onClick={handleRetry} className="flex-1">
-                <Camera className="w-4 h-4 mr-2" />
+              <Button 
+                onClick={handleRetry} 
+                className="flex-1 h-12 sm:h-10 text-base sm:text-sm font-semibold"
+              >
+                <Camera className="w-5 h-5 sm:w-4 sm:h-4 mr-2" />
                 Retry
               </Button>
             )}
