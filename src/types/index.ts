@@ -54,3 +54,48 @@ export interface DeviceHistory {
   action: 'pickup' | 'return';
   timestamp: Date;
 }
+
+export type QRCodeType = 'pickup' | 'return';
+
+export interface QRCode {
+  id: string;
+  type: QRCodeType;
+  code: string;
+  validFrom: Date;
+  validUntil?: Date;
+  isActive: boolean;
+  createdAt: Date;
+  lastUpdatedAt?: Date;
+}
+
+export interface DeviceStatistics {
+  daily: {
+    date: string;
+    devicesNeeded: number;
+    breakdown: Array<{
+      teacherId: string;
+      teacherName: string;
+      course: string;
+      devicesNeeded: number;
+    }>;
+  };
+  weekly: {
+    weekStart: string;
+    weekEnd: string;
+    totalDevicesNeeded: number;
+    dailyBreakdown: Array<{
+      day: string;
+      devicesNeeded: number;
+    }>;
+  };
+  semester: {
+    semesterName: string;
+    startDate: string;
+    endDate: string;
+    totalDevicesNeeded: number;
+    weeklyBreakdown: Array<{
+      week: number;
+      devicesNeeded: number;
+    }>;
+  };
+}

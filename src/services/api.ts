@@ -157,3 +157,72 @@ export const notificationsAPI = {
     });
   },
 };
+
+// QR Code API
+export const qrCodeAPI = {
+  getAll: async () => {
+    return fetchAPI('/qr-codes');
+  },
+  getActive: async (type: 'pickup' | 'return') => {
+    return fetchAPI(`/qr-codes/active/${type}`);
+  },
+  generate: async (type: 'pickup' | 'return', validUntil?: string) => {
+    return fetchAPI('/qr-codes/generate', {
+      method: 'POST',
+      body: JSON.stringify({ type, validUntil }),
+    });
+  },
+  update: async (id: string, validUntil?: string) => {
+    return fetchAPI(`/qr-codes/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ validUntil }),
+    });
+  },
+  deactivate: async (id: string) => {
+    return fetchAPI(`/qr-codes/${id}/deactivate`, {
+      method: 'PUT',
+    });
+  },
+};
+
+// Statistics API
+export const statisticsAPI = {
+  getDeviceStatistics: async (period: 'daily' | 'weekly' | 'semester', date?: string) => {
+    const queryParams = date ? `?date=${date}` : '';
+    return fetchAPI(`/statistics/devices/${period}${queryParams}`);
+  },
+};
+
+// Timetable Upload API
+export const timetableUploadAPI = {
+  uploadFile: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/timetable/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Upload failed' }));
+      throw new Error(error.error || 'Upload failed');
+    }
+
+    return response.json();
+  },
+  bulkAdd: async (entries: Array<{
+    teacherId: string;
+    teacherName: string;
+    course: string;
+    classroom?: string;
+    day: string;
+    startTime: string;
+    endTime: string;
+  }>) => {
+    return fetchAPI('/timetable/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ entries }),
+    });
+  },
+};
