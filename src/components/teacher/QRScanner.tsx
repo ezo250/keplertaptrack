@@ -18,7 +18,8 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
   const [cameraPermission, setCameraPermission] = useState<'granted' | 'denied' | 'prompt'>('prompt');
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
+  const scanningRef = useRef<boolean>(false);
+  const scanIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -51,7 +52,7 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
   };
 
   const startScanning = async () => {
-    if (!videoRef.current || isScanning) return;
+    if (!videoRef.current || scanningRef.current) return;
 
     try {
       setIsScanning(true);
@@ -66,8 +67,8 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
       const constraints: MediaStreamConstraints = {
         video: {
           facingMode: { ideal: 'environment' }, // Prefer rear camera on mobile
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+          width: { ideal: 1920, min: 640 },
+          height: { ideal: 1080, min: 480 },
         },
         audio: false,
       };
@@ -76,10 +77,24 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
       
       if (videoRef.current) {
         videoRef.current.srcObject = streamRef.current;
+        
+        // Wait for video to be ready
+        await new Promise<void>((resolve) => {
+          if (videoRef.current) {
+            videoRef.current.onloadedmetadata = () => {
+              resolve();
+            };
+          }
+        });
+
         await videoRef.current.play();
         setCameraPermission('granted');
         
-        // Start continuous scanning
+        // Wait a bit more for video to stabilize
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Start continuous scanning with interval
+        scanningRef.current = true;
         scanContinuously();
       }
     } catch (err: any) {
@@ -96,24 +111,29 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
         setError('Failed to access camera. Please try again.');
       }
       setIsScanning(false);
+      scanningRef.current = false;
     }
   };
 
-  const scanContinuously = async () => {
-    if (!readerRef.current || !videoRef.current || !streamRef.current) return;
+  const scanContinuously = () => {
+    if (!readerRef.current || !videoRef.current || !scanningRef.current) return;
 
-    const scan = async () => {
-      if (!videoRef.current || !readerRef.current || !isScanning) return;
+    const performScan = async () => {
+      if (!videoRef.current || !readerRef.current || !scanningRef.current) return;
 
       try {
-        const result = await readerRef.current.decodeFromVideoElement(videoRef.current);
-        
-        if (result && result.getText()) {
-          // Success - QR code detected
-          onScan(result.getText());
-          stopScanning();
-          onClose();
-          return;
+        // Check if video is ready
+        if (videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+          const result = await readerRef.current.decodeFromVideoElement(videoRef.current);
+          
+          if (result && result.getText()) {
+            // Success - QR code detected
+            console.log('QR Code detected:', result.getText());
+            onScan(result.getText());
+            stopScanning();
+            onClose();
+            return;
+          }
         }
       } catch (err) {
         // NotFoundException is expected when no QR code is in view
@@ -121,21 +141,20 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
           console.error('Scanning error:', err);
         }
       }
-
-      // Continue scanning
-      animationFrameRef.current = requestAnimationFrame(scan);
     };
 
-    scan();
+    // Use setInterval for more reliable continuous scanning
+    scanIntervalRef.current = setInterval(performScan, 300); // Scan every 300ms
   };
 
   const stopScanning = () => {
+    scanningRef.current = false;
     setIsScanning(false);
 
-    // Cancel animation frame
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
+    // Clear scan interval
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current);
+      scanIntervalRef.current = null;
     }
 
     // Stop video stream
@@ -198,8 +217,15 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
             
             {/* Scanning overlay */}
             {isScanning && !error && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-48 h-48 border-4 border-primary rounded-lg animate-pulse" />
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="relative">
+                  <div className="w-48 h-48 border-4 border-primary rounded-lg animate-pulse" />
+                  {/* Corner guides */}
+                  <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-white" />
+                  <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-white" />
+                  <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-white" />
+                  <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-white" />
+                </div>
               </div>
             )}
 
@@ -228,7 +254,7 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
           {isScanning && !error && (
             <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
               <p className="text-sm text-center text-primary font-medium">
-                Position the QR code within the frame
+                📱 Position the QR code within the frame - scanning automatically...
               </p>
             </div>
           )}
