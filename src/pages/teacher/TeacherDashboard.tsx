@@ -97,7 +97,14 @@ export default function TeacherDashboard() {
   };
 
   const handleQRScan = async (scannedCode: string) => {
-    if (!selectedDevice || !user) return;
+    console.log('[TeacherDashboard] QR code scanned:', scannedCode);
+    
+    if (!selectedDevice || !user) {
+      console.error('[TeacherDashboard] Missing selectedDevice or user');
+      setQrError('Session error. Please try again.');
+      setIsQRScannerOpen(false);
+      return;
+    }
 
     // Immediately close scanner and show feedback for instant response
     setIsQRScannerOpen(false);
@@ -109,6 +116,8 @@ export default function TeacherDashboard() {
     const deviceDbId = selectedDevice.id;
     const mode = qrScanMode;
     
+    console.log('[TeacherDashboard] Processing', mode, 'for device:', deviceId);
+    
     // Clear selected device immediately
     setSelectedDevice(null);
 
@@ -118,14 +127,19 @@ export default function TeacherDashboard() {
         setTimeout(() => reject(new Error('Request timeout')), 5000)
       );
 
+      console.log('[TeacherDashboard] Fetching active QR code from API...');
+      
       // Fetch active QR code from backend with timeout
       const activeQRCode = await Promise.race([
         qrCodeAPI.getActive(mode),
         timeoutPromise
       ]) as any;
       
+      console.log('[TeacherDashboard] Active QR code received:', activeQRCode);
+      
       // Verify the scanned code matches the active QR code
-      if (activeQRCode.code !== scannedCode) {
+      if (!activeQRCode || activeQRCode.code !== scannedCode) {
+        console.error('[TeacherDashboard] QR code mismatch. Expected:', activeQRCode?.code, 'Got:', scannedCode);
         setQrError('Invalid QR code. Please scan the correct QR code for ' + mode + '.');
         setIsVerifyingQR(false);
         return;
@@ -135,11 +149,14 @@ export default function TeacherDashboard() {
       if (activeQRCode.validUntil) {
         const validUntil = new Date(activeQRCode.validUntil);
         if (validUntil < new Date()) {
+          console.error('[TeacherDashboard] QR code expired');
           setQrError('QR code has expired. Please contact admin for a new code.');
           setIsVerifyingQR(false);
           return;
         }
       }
+
+      console.log('[TeacherDashboard] QR code verified successfully, proceeding with action');
 
       // QR code is valid, proceed with action
       // Execute pickup/return immediately without waiting
@@ -155,7 +172,7 @@ export default function TeacherDashboard() {
         setShowReturnSuccess(true);
       }
     } catch (error: any) {
-      console.error('QR verification error:', error);
+      console.error('[TeacherDashboard] QR verification error:', error);
       setIsVerifyingQR(false);
       
       if (error.message === 'Request timeout') {

@@ -5,6 +5,7 @@ import { useData } from '@/contexts/DataContext';
 import Header from '@/components/layout/Header';
 import DeviceCard from '@/components/dashboard/DeviceCard';
 import PickupSuccessModal from '@/components/modals/PickupSuccessModal';
+import ReturnSuccessModal from '@/components/modals/ReturnSuccessModal';
 import QRScanner from '@/components/teacher/QRScanner';
 import DeviceRestrictionModal from '@/components/modals/DeviceRestrictionModal';
 import { Button } from '@/components/ui/button';
