@@ -3,9 +3,37 @@ import { prisma } from '../index';
 
 const router = express.Router();
 
+// Helper function to check and update overdue devices
+async function checkAndUpdateOverdueDevices() {
+  const now = new Date();
+  const OVERDUE_THRESHOLD_MS = (10 * 60 + 30) * 60 * 1000; // 10 hours 30 minutes in milliseconds
+
+  // Find all devices that are in_use
+  const devicesInUse = await prisma.device.findMany({
+    where: { status: 'in_use' },
+  });
+
+  // Check each device and update if overdue
+  for (const device of devicesInUse) {
+    if (device.pickedUpAt) {
+      const timeSincePickup = now.getTime() - new Date(device.pickedUpAt).getTime();
+      
+      if (timeSincePickup > OVERDUE_THRESHOLD_MS && device.status !== 'overdue') {
+        await prisma.device.update({
+          where: { id: device.id },
+          data: { status: 'overdue' },
+        });
+      }
+    }
+  }
+}
+
 // Get all devices
 router.get('/', async (req, res) => {
   try {
+    // Check and update overdue devices before fetching
+    await checkAndUpdateOverdueDevices();
+
     const devices = await prisma.device.findMany({
       orderBy: { deviceId: 'asc' },
     });
@@ -72,7 +100,7 @@ router.post('/:id/pickup', async (req, res) => {
     const { userId, userName } = req.body;
 
     const now = new Date();
-    const expectedReturn = new Date(now.getTime() + 2 * 60 * 60 * 1000); // 2 hours
+    const expectedReturn = new Date(now.getTime() + (10 * 60 + 30) * 60 * 1000); // 10 hours 30 minutes
 
     const device = await prisma.device.update({
       where: { id },
