@@ -20,7 +20,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Upload, FileText, CheckCircle, XCircle, Download, Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Upload, FileText, CheckCircle, XCircle, Download, Loader2, Edit2, Trash2, Plus, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { TimetableEntry } from '@/types';
 
@@ -46,13 +54,15 @@ interface TimetableUploadProps {
 
 export default function TimetableUpload({ teachers, onUploadComplete }: TimetableUploadProps) {
   const [parsedData, setParsedData] = useState<ParsedTimetableEntry[]>([]);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingEntry, setEditingEntry] = useState<ParsedTimetableEntry | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingProgress, setProcessingProgress] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
   const validateEntry = (entry: any): ParsedTimetableEntry => {
     const errors: string[] = [];
@@ -73,7 +83,7 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
     // Validate day
     const dayValue = entry.day?.toString().trim();
     if (!dayValue || !days.some(d => d.toLowerCase() === dayValue.toLowerCase())) {
-      errors.push('Valid day is required (Monday-Friday)');
+      errors.push('Valid day is required (Monday-Sunday)');
       isValid = false;
     }
 
@@ -134,38 +144,43 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
     
     // Try to find teacher name (usually in the first few rows)
     let teacherName = '';
-    for (let row = 0; row < Math.min(5, range.e.r); row++) {
-      const cell = firstSheet[XLSX.utils.encode_cell({ r: row, c: 0 })];
-      if (cell && cell.v && typeof cell.v === 'string') {
-        const cellValue = cell.v.toString().trim();
-        // Check if this looks like a name (contains spaces, no numbers at start)
-        if (cellValue.includes(' ') && !/^\d/.test(cellValue) && cellValue.length < 50) {
-          teacherName = cellValue;
-          break;
+    for (let row = 0; row < Math.min(10, range.e.r); row++) {
+      for (let col = 0; col < Math.min(5, range.e.c); col++) {
+        const cell = firstSheet[XLSX.utils.encode_cell({ r: row, c: col })];
+        if (cell && cell.v && typeof cell.v === 'string') {
+          const cellValue = cell.v.toString().trim();
+          // Check if this looks like a name (contains spaces, no numbers at start, reasonable length)
+          if (cellValue.match(/^[A-Z][a-z]+\s+[A-Z][a-z]+/) && cellValue.length < 50 && cellValue.length > 5) {
+            teacherName = cellValue;
+            break;
+          }
         }
       }
+      if (teacherName) break;
     }
 
     const entries: ParsedTimetableEntry[] = [];
     
-    // Map day abbreviations to full names
+    // Map day abbreviations to full names (including Sat & Sun)
     const dayMap: Record<string, string> = {
       'mo': 'Monday', 'mon': 'Monday', 'monday': 'Monday',
       'tu': 'Tuesday', 'tue': 'Tuesday', 'tuesday': 'Tuesday',
       'we': 'Wednesday', 'wed': 'Wednesday', 'wednesday': 'Wednesday',
       'th': 'Thursday', 'thu': 'Thursday', 'thursday': 'Thursday',
       'fr': 'Friday', 'fri': 'Friday', 'friday': 'Friday',
+      'sa': 'Saturday', 'sat': 'Saturday', 'saturday': 'Saturday',
+      'su': 'Sunday', 'sun': 'Sunday', 'sunday': 'Sunday',
     };
 
     // Find day columns
     const dayColumns: Array<{ col: number; day: string }> = [];
     for (let col = 0; col <= range.e.c; col++) {
-      for (let row = 0; row < Math.min(10, range.e.r); row++) {
+      for (let row = 0; row < Math.min(15, range.e.r); row++) {
         const cell = firstSheet[XLSX.utils.encode_cell({ r: row, c: col })];
         if (cell && cell.v) {
           const cellValue = cell.v.toString().trim().toLowerCase();
           const matchedDay = dayMap[cellValue];
-          if (matchedDay) {
+          if (matchedDay && !dayColumns.find(dc => dc.day === matchedDay)) {
             dayColumns.push({ col, day: matchedDay });
             break;
           }
@@ -173,21 +188,32 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
       }
     }
 
-    // Find session rows (rows with time information)
-    const sessionRows: Array<{ row: number; startTime: string; endTime: string }> = [];
+    // Find session rows with better time detection (Session 1-4 format)
+    const sessionRows: Array<{ row: number; startTime: string; endTime: string; sessionName?: string }> = [];
     for (let row = 0; row <= range.e.r; row++) {
-      for (let col = 0; col <= Math.min(2, range.e.c); col++) {
+      let sessionName = '';
+      let timeFound = false;
+      
+      for (let col = 0; col <= Math.min(3, range.e.c); col++) {
         const cell = firstSheet[XLSX.utils.encode_cell({ r: row, c: col })];
         if (cell && cell.v) {
           const cellValue = cell.v.toString().trim();
-          // Look for time patterns like "8:00 - 9:00" or "8:00-9:00" or in separate cells
-          const timeMatch = cellValue.match(/(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})/);
-          if (timeMatch) {
+          
+          // Check if this cell contains "Session" keyword
+          if (cellValue.match(/Session\s*\d/i)) {
+            sessionName = cellValue;
+          }
+          
+          // Look for time patterns like "8:00 - 9:00" or "8:00-9:00" or "08:00 - 09:00"
+          const timeMatch = cellValue.match(/(\d{1,2}:\d{2})\s*[-–to]+\s*(\d{1,2}:\d{2})/i);
+          if (timeMatch && !timeFound) {
             sessionRows.push({
               row,
               startTime: timeMatch[1],
               endTime: timeMatch[2],
+              sessionName,
             });
+            timeFound = true;
             break;
           }
         }
@@ -204,7 +230,8 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
           // Skip empty cells, breaks, or cells that only contain day names
           if (!cellValue || 
               cellValue.toLowerCase().includes('break') || 
-              cellValue.toLowerCase() === day.toLowerCase()) {
+              cellValue.toLowerCase() === day.toLowerCase() ||
+              cellValue.toLowerCase().includes('office hours')) {
             return;
           }
 
@@ -216,10 +243,16 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
             let course = lines[0];
             let classroom = '';
 
-            // Look for classroom in the last line (usually contains "Classroom" or "Room")
-            for (let i = lines.length - 1; i >= 1; i--) {
-              if (lines[i].toLowerCase().includes('classroom') || 
-                  lines[i].toLowerCase().includes('room')) {
+            // Look for classroom in subsequent lines
+            for (let i = 1; i < lines.length; i++) {
+              const line = lines[i].toLowerCase();
+              if (line.includes('classroom') || line.includes('room')) {
+                classroom = lines[i];
+                break;
+              }
+              // Sometimes classroom is mentioned without the word "classroom"
+              else if (line.match(/^[a-z]+\s+classroom$/i) || 
+                       line.match(/^(gasabo|kirehe|musanze|burera|muhanga)/i)) {
                 classroom = lines[i];
                 break;
               }
@@ -259,7 +292,7 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
         const hasGridFormat = firstRow.some((cell: any) => {
           if (!cell) return false;
           const cellStr = cell.toString().toLowerCase().trim();
-          return ['mo', 'tu', 'we', 'th', 'fr', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+          return ['mo', 'tu', 'we', 'th', 'fr', 'sa', 'su', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
             .some(day => cellStr.includes(day));
         });
 
@@ -290,24 +323,49 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
     const entries: ParsedTimetableEntry[] = [];
     const lines = text.split('\n').map(l => l.trim()).filter(l => l);
     
-    // Map day abbreviations to full names
+    // Map day abbreviations to full names (including Sat & Sun)
     const dayMap: Record<string, string> = {
       'mo': 'Monday', 'mon': 'Monday', 'monday': 'Monday',
       'tu': 'Tuesday', 'tue': 'Tuesday', 'tuesday': 'Tuesday',
       'we': 'Wednesday', 'wed': 'Wednesday', 'wednesday': 'Wednesday',
       'th': 'Thursday', 'thu': 'Thursday', 'thursday': 'Thursday',
       'fr': 'Friday', 'fri': 'Friday', 'friday': 'Friday',
+      'sa': 'Saturday', 'sat': 'Saturday', 'saturday': 'Saturday',
+      'su': 'Sunday', 'sun': 'Sunday', 'sunday': 'Sunday',
     };
 
     let teacherName = '';
     
     // Try to find teacher name (usually in first few lines, contains full name pattern)
-    for (let i = 0; i < Math.min(5, lines.length); i++) {
+    for (let i = 0; i < Math.min(10, lines.length); i++) {
       const line = lines[i];
       // Look for name pattern (First Last) or (Title First Last)
-      if (line.match(/^[A-Z][a-z]+\s+[A-Z][a-z]+/) && line.length < 50 && !line.match(/\d/)) {
+      if (line.match(/^[A-Z][a-z]+\s+[A-Z][a-z]+/) && line.length < 50 && line.length > 5 && !line.match(/Session|Break|Timetable/i)) {
         teacherName = line;
         break;
+      }
+    }
+
+    // Session detection patterns
+    const sessionPatterns = [
+      /Session\s*1/i,
+      /Session\s*2/i,
+      /Session\s*3/i,
+      /Session\s*4/i,
+    ];
+
+    // Look for timetable grid structure
+    let currentDay = '';
+    const dayLineIndices: number[] = [];
+    
+    // Find lines that contain day abbreviations
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].toLowerCase();
+      for (const [key, value] of Object.entries(dayMap)) {
+        if (line.includes(key) && line.length < 30) {
+          dayLineIndices.push(i);
+          break;
+        }
       }
     }
 
@@ -315,16 +373,24 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       
-      // Try to match time patterns
-      const timeMatch = line.match(/(\d{1,2}:\d{2})\s*[-–to]+\s*(\d{1,2}:\d{2})/);
+      // Try to match time patterns (Session 1: 8:00-9:00, etc.)
+      const timeMatch = line.match(/(\d{1,2}:\d{2})\s*[-–to]+\s*(\d{1,2}:\d{2})/i);
       
       if (timeMatch) {
         const startTime = timeMatch[1];
         const endTime = timeMatch[2];
         
+        // Look for session number
+        let sessionNum = 0;
+        sessionPatterns.forEach((pattern, idx) => {
+          if (line.match(pattern)) {
+            sessionNum = idx + 1;
+          }
+        });
+        
         // Look for day in current or nearby lines
         let day = '';
-        for (let j = Math.max(0, i - 2); j < Math.min(lines.length, i + 3); j++) {
+        for (let j = Math.max(0, i - 3); j < Math.min(lines.length, i + 5); j++) {
           const nearbyLine = lines[j].toLowerCase();
           for (const [key, value] of Object.entries(dayMap)) {
             if (nearbyLine.includes(key)) {
@@ -335,32 +401,37 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
           if (day) break;
         }
 
-        // Look for course name (usually before or after time)
+        // Look for course name (usually in surrounding lines or same section)
         let course = '';
         let classroom = '';
         
-        // Check line before time
-        if (i > 0 && !lines[i - 1].match(/\d{1,2}:\d{2}/) && lines[i - 1].length > 3) {
-          course = lines[i - 1];
-        }
-        // Check line after time
-        else if (i < lines.length - 1 && !lines[i + 1].match(/\d{1,2}:\d{2}/) && lines[i + 1].length > 3) {
-          course = lines[i + 1];
-        }
-        // Check same line (remove time part)
-        else {
-          const courseMatch = line.replace(/\d{1,2}:\d{2}\s*[-–to]+\s*\d{1,2}:\d{2}/, '').trim();
-          if (courseMatch.length > 3) {
-            course = courseMatch;
-          }
-        }
-
-        // Look for classroom info nearby
-        for (let j = Math.max(0, i - 2); j < Math.min(lines.length, i + 3); j++) {
+        // Search within a window around the time entry
+        for (let j = Math.max(0, i - 5); j < Math.min(lines.length, i + 5); j++) {
           const nearbyLine = lines[j];
-          if (nearbyLine.toLowerCase().includes('room') || nearbyLine.toLowerCase().includes('classroom')) {
+          
+          // Skip lines that are just times, breaks, or session labels
+          if (nearbyLine.match(/^\d{1,2}:\d{2}/) || 
+              nearbyLine.toLowerCase().includes('break') ||
+              nearbyLine.match(/^Session\s*\d/i)) {
+            continue;
+          }
+          
+          // Look for course-like content (longer text with no time)
+          if (nearbyLine.length > 10 && 
+              !nearbyLine.match(/\d{1,2}:\d{2}/) &&
+              !course) {
+            // Check if it looks like a course name (contains words like "AY", section info, etc.)
+            if (nearbyLine.match(/[A-Z]{2,}/) || 
+                nearbyLine.match(/Section|BA|Bs|AY/i) ||
+                nearbyLine.length > 20) {
+              course = nearbyLine;
+            }
+          }
+          
+          // Look for classroom info
+          if (nearbyLine.match(/Classroom|Room/i) ||
+              nearbyLine.match(/^(Gasabo|Kirehe|Musanze|Burera|Muhanga)/i)) {
             classroom = nearbyLine;
-            break;
           }
         }
 
@@ -394,12 +465,13 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
       
       const allEntries: ParsedTimetableEntry[] = [];
       
-      // Process each page
+      // Process each page with higher quality settings
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
         setProcessingProgress(`Processing page ${pageNum} of ${pdf.numPages}...`);
         
         const page = await pdf.getPage(pageNum);
-        const viewport = page.getViewport({ scale: 2.0 });
+        // Increase scale for better OCR accuracy
+        const viewport = page.getViewport({ scale: 3.0 });
         
         // Create canvas to render PDF page
         const canvas = document.createElement('canvas');
@@ -421,7 +493,7 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
           
           setProcessingProgress(`Running OCR on page ${pageNum}...`);
           
-          // Run OCR on the page
+          // Run OCR on the page with enhanced settings
           const result = await Tesseract.recognize(blob, 'eng', {
             logger: (m) => {
               if (m.status === 'recognizing text') {
@@ -507,6 +579,51 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
     fileInputRef.current?.click();
   };
 
+  // Edit functionality
+  const handleEditEntry = (index: number) => {
+    setEditingIndex(index);
+    setEditingEntry({ ...parsedData[index] });
+  };
+
+  const handleSaveEntry = () => {
+    if (editingIndex !== null && editingEntry) {
+      const validated = validateEntry(editingEntry);
+      const newData = [...parsedData];
+      newData[editingIndex] = validated;
+      setParsedData(newData);
+      setEditingIndex(null);
+      setEditingEntry(null);
+      toast.success('Entry updated successfully');
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingIndex(null);
+    setEditingEntry(null);
+  };
+
+  const handleDeleteEntry = (index: number) => {
+    const newData = parsedData.filter((_, i) => i !== index);
+    setParsedData(newData);
+    toast.success('Entry deleted');
+  };
+
+  const handleAddEntry = () => {
+    const newEntry: ParsedTimetableEntry = {
+      teacherName: '',
+      course: '',
+      classroom: '',
+      day: 'Monday',
+      startTime: '09:00',
+      endTime: '10:00',
+      isValid: false,
+      errors: ['Please fill all required fields'],
+    };
+    setParsedData([...parsedData, newEntry]);
+    setEditingIndex(parsedData.length);
+    setEditingEntry(newEntry);
+  };
+
   const handleUploadToSystem = async () => {
     const validEntries = parsedData.filter(e => e.isValid);
     
@@ -575,7 +692,7 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
               <div>
                 <CardTitle>Timetable Upload</CardTitle>
                 <CardDescription>
-                  Upload timetable from CSV, Excel, or PDF file. The system will automatically match teachers and validate entries.
+                  Upload timetable from CSV, Excel, or PDF file. Review and edit entries before uploading.
                 </CardDescription>
               </div>
             </div>
@@ -630,7 +747,7 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
                       {isDragging ? 'Drop file here' : 'Click to upload or drag and drop'}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      CSV, Excel, or PDF files
+                      CSV, Excel, or PDF files (Supports Session 1-4, Mon-Sun)
                     </p>
                   </>
                 )}
@@ -657,7 +774,7 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2 pl-4">
                   <div>• teacherName (required)</div>
                   <div>• course (required)</div>
-                  <div>• day (required)</div>
+                  <div>• day (Monday-Sunday)</div>
                   <div>• startTime (required)</div>
                   <div>• endTime (required)</div>
                   <div>• classroom (optional)</div>
@@ -668,11 +785,13 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
                 <div className="pl-4">
                   • Teacher name at the top
                   <br />
-                  • Days as column headers (Mo, Tu, We, Th, Fr)
+                  • Days as column headers (Mo, Tu, We, Th, Fr, Sa, Su)
                   <br />
-                  • Sessions with time slots as rows
+                  • Sessions 1-4 with time slots as rows (e.g., Session 1: 8:00-9:00)
                   <br />
                   • Course information in grid cells
+                  <br />
+                  • Automatically skips breaks (Morning, Lunch, Afternoon)
                 </div>
               </div>
               <div className="mt-2 text-xs text-muted-foreground">
@@ -680,9 +799,11 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
                 <div className="pl-4">
                   • Scanned or digital timetables
                   <br />
-                  • System will extract text using OCR
+                  • System will extract text using enhanced OCR
                   <br />
-                  • Looks for teacher names, days, times, and courses
+                  • Detects teacher names, days (Mon-Sun), sessions 1-4, times, and courses
+                  <br />
+                  • Higher accuracy for clear, high-resolution PDFs
                   <br />
                   • Processing may take longer for multiple pages
                 </div>
@@ -705,6 +826,15 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
                       <span className="font-medium">{invalidCount} invalid</span>
                     </div>
                   )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddEntry}
+                    className="gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Entry
+                  </Button>
                 </div>
                 <Button
                   onClick={handleUploadToSystem}
@@ -721,7 +851,7 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
               </div>
 
               <div className="border border-border/50 rounded-lg overflow-hidden">
-                <div className="max-h-[500px] overflow-y-auto">
+                <div className="max-h-[600px] overflow-y-auto">
                   <Table>
                     <TableHeader className="sticky top-0 bg-background z-10">
                       <TableRow>
@@ -732,36 +862,159 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
                         <TableHead>Time</TableHead>
                         <TableHead>Classroom</TableHead>
                         <TableHead>Issues</TableHead>
+                        <TableHead className="w-[120px]">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {parsedData.map((entry, index) => (
                         <TableRow key={index} className={!entry.isValid ? 'bg-destructive/5' : ''}>
-                          <TableCell>
-                            {entry.isValid ? (
-                              <CheckCircle className="w-4 h-4 text-success" />
-                            ) : (
-                              <XCircle className="w-4 h-4 text-destructive" />
-                            )}
-                          </TableCell>
-                          <TableCell className="font-medium">{entry.teacherName}</TableCell>
-                          <TableCell>{entry.course}</TableCell>
-                          <TableCell>{entry.day}</TableCell>
-                          <TableCell className="text-sm">
-                            {entry.startTime} - {entry.endTime}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {entry.classroom || '-'}
-                          </TableCell>
-                          <TableCell>
-                            {entry.errors.length > 0 ? (
-                              <div className="text-xs text-destructive">
-                                {entry.errors.join(', ')}
-                              </div>
-                            ) : (
-                              <span className="text-xs text-success">Valid</span>
-                            )}
-                          </TableCell>
+                          {editingIndex === index && editingEntry ? (
+                            // Edit Mode
+                            <>
+                              <TableCell>
+                                <XCircle className="w-4 h-4 text-muted-foreground" />
+                              </TableCell>
+                              <TableCell>
+                                <Select
+                                  value={editingEntry.teacherName}
+                                  onValueChange={(value) => setEditingEntry({ ...editingEntry, teacherName: value })}
+                                >
+                                  <SelectTrigger className="h-8">
+                                    <SelectValue placeholder="Select teacher" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {teachers.map((teacher) => (
+                                      <SelectItem key={teacher.id} value={teacher.name}>
+                                        {teacher.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  value={editingEntry.course}
+                                  onChange={(e) => setEditingEntry({ ...editingEntry, course: e.target.value })}
+                                  className="h-8"
+                                  placeholder="Course name"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Select
+                                  value={editingEntry.day}
+                                  onValueChange={(value) => setEditingEntry({ ...editingEntry, day: value })}
+                                >
+                                  <SelectTrigger className="h-8 w-[130px]">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {days.map((day) => (
+                                      <SelectItem key={day} value={day}>
+                                        {day}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell className="flex gap-1">
+                                <Input
+                                  type="time"
+                                  value={editingEntry.startTime}
+                                  onChange={(e) => setEditingEntry({ ...editingEntry, startTime: e.target.value })}
+                                  className="h-8 w-24"
+                                />
+                                <span className="py-1">-</span>
+                                <Input
+                                  type="time"
+                                  value={editingEntry.endTime}
+                                  onChange={(e) => setEditingEntry({ ...editingEntry, endTime: e.target.value })}
+                                  className="h-8 w-24"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  value={editingEntry.classroom}
+                                  onChange={(e) => setEditingEntry({ ...editingEntry, classroom: e.target.value })}
+                                  className="h-8"
+                                  placeholder="Classroom"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-xs text-muted-foreground">Editing...</span>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleSaveEntry}
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <Save className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleCancelEdit}
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <XCircle className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </>
+                          ) : (
+                            // View Mode
+                            <>
+                              <TableCell>
+                                {entry.isValid ? (
+                                  <CheckCircle className="w-4 h-4 text-success" />
+                                ) : (
+                                  <XCircle className="w-4 h-4 text-destructive" />
+                                )}
+                              </TableCell>
+                              <TableCell className="font-medium">{entry.teacherName}</TableCell>
+                              <TableCell className="max-w-[200px] truncate" title={entry.course}>
+                                {entry.course}
+                              </TableCell>
+                              <TableCell>{entry.day}</TableCell>
+                              <TableCell className="text-sm">
+                                {entry.startTime} - {entry.endTime}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {entry.classroom || '-'}
+                              </TableCell>
+                              <TableCell>
+                                {entry.errors.length > 0 ? (
+                                  <div className="text-xs text-destructive max-w-[150px] truncate" title={entry.errors.join(', ')}>
+                                    {entry.errors.join(', ')}
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-success">Valid</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEditEntry(index)}
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteEntry(index)}
+                                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </>
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>

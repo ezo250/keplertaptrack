@@ -50,7 +50,7 @@ export default function AdminDashboard() {
           teacherName: entry.teacherName,
           course: entry.course,
           classroom: entry.classroom,
-          day: entry.day as 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday',
+          day: entry.day as 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday',
           startTime: entry.startTime,
           endTime: entry.endTime,
         });
