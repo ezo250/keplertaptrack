@@ -150,7 +150,11 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
         if (cell && cell.v && typeof cell.v === 'string') {
           const cellValue = cell.v.toString().trim();
           // Check if this looks like a name (contains spaces, no numbers at start, reasonable length)
-          if (cellValue.match(/^[A-Z][a-z]+\s+[A-Z][a-z]+/) && cellValue.length < 50 && cellValue.length > 5) {
+          // Exclude address patterns and timetable headers
+          if (cellValue.match(/^[A-Z][a-z]+\s+[A-Z][a-z]+/) && 
+              cellValue.length < 50 && 
+              cellValue.length > 5 &&
+              !cellValue.match(/College|KG\s*\d+|Ave|Kigali|Term|Timetable/i)) {
             teacherName = cellValue;
             break;
           }
@@ -220,9 +224,23 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
       }
     }
 
+    // Helper to validate time is within operational hours (8:00-18:15)
+    const isValidTime = (time: string): boolean => {
+      const [hours, minutes] = time.split(':').map(Number);
+      const totalMinutes = hours * 60 + minutes;
+      const startMinutes = 8 * 60; // 8:00
+      const endMinutes = 18 * 60 + 15; // 18:15
+      return totalMinutes >= startMinutes && totalMinutes <= endMinutes;
+    };
+
     // Parse course information from grid cells
     dayColumns.forEach(({ col, day }) => {
       sessionRows.forEach(({ row, startTime, endTime }) => {
+        // Validate times are within operational hours
+        if (!isValidTime(startTime) || !isValidTime(endTime)) {
+          return;
+        }
+
         const cell = firstSheet[XLSX.utils.encode_cell({ r: row, c: col })];
         if (cell && cell.v) {
           const cellValue = cell.v.toString().trim();
@@ -230,8 +248,12 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
           // Skip empty cells, breaks, or cells that only contain day names
           if (!cellValue || 
               cellValue.toLowerCase().includes('break') || 
-              cellValue.toLowerCase() === day.toLowerCase() ||
-              cellValue.toLowerCase().includes('office hours')) {
+              cellValue.toLowerCase() === day.toLowerCase()) {
+            return;
+          }
+
+          // Filter out Kepler address
+          if (cellValue.match(/Kepler\s+College|KG\s*\d+\s+Ave|Kigali/i)) {
             return;
           }
 
@@ -239,35 +261,52 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
           const lines = cellValue.split('\n').map(l => l.trim()).filter(l => l);
           
           if (lines.length > 0) {
-            // First line is usually the course name
-            let course = lines[0];
+            // Find the course name (look for lines with course patterns)
+            let course = '';
             let classroom = '';
 
-            // Look for classroom in subsequent lines
-            for (let i = 1; i < lines.length; i++) {
-              const line = lines[i].toLowerCase();
-              if (line.includes('classroom') || line.includes('room')) {
-                classroom = lines[i];
-                break;
+            for (let i = 0; i < lines.length; i++) {
+              const line = lines[i];
+              
+              // Skip address lines
+              if (line.match(/Kepler\s+College|KG\s*\d+|Ave\s*\d+|Kigali/i)) {
+                continue;
               }
-              // Sometimes classroom is mentioned without the word "classroom"
-              else if (line.match(/^[a-z]+\s+classroom$/i) || 
-                       line.match(/^(gasabo|kirehe|musanze|burera|muhanga)/i)) {
-                classroom = lines[i];
-                break;
+              
+              // Look for classroom (contains location name + "Classroom")
+              if (line.match(/(Gasabo|Kirehe|Musanze|Burera|Muhanga)\s+Classroom/i)) {
+                classroom = line;
+                continue;
+              }
+              
+              // Look for course - should contain course identifiers
+              // Courses like: "Office Hours-Fundamentals..." or "Critical Thinking and..."
+              if (!course && line.length > 10) {
+                // Valid course patterns:
+                // - Contains AY XX/XX (academic year)
+                // - Contains Section info
+                // - Contains program codes (BsBA, BAPM)
+                // - Or is a descriptive course name
+                if (line.match(/AY\s*\d{2}\/\d{2}|Section\s+[A-Z]|BA[A-Z]{2,}|Bs[A-Z]{2,}/i) ||
+                    (line.length > 15 && !line.match(/^\d/) && !line.toLowerCase().includes('office hours') && i === 0)) {
+                  course = line;
+                }
               }
             }
 
-            entries.push({
-              teacherName: teacherName,
-              course: course,
-              classroom: classroom,
-              day: day,
-              startTime: startTime,
-              endTime: endTime,
-              isValid: true,
-              errors: [],
-            });
+            // If we found a valid course, add the entry
+            if (course) {
+              entries.push({
+                teacherName: teacherName,
+                course: course,
+                classroom: classroom,
+                day: day,
+                startTime: startTime,
+                endTime: endTime,
+                isValid: true,
+                errors: [],
+              });
+            }
           }
         }
       });
@@ -334,13 +373,20 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
       'su': 'Sunday', 'sun': 'Sunday', 'sunday': 'Sunday',
     };
 
+    // Known Kepler campus classroom locations
+    const campusLocations = ['Gasabo', 'Kirehe', 'Musanze', 'Burera', 'Muhanga'];
+
     let teacherName = '';
     
     // Try to find teacher name (usually in first few lines, contains full name pattern)
     for (let i = 0; i < Math.min(10, lines.length); i++) {
       const line = lines[i];
       // Look for name pattern (First Last) or (Title First Last)
-      if (line.match(/^[A-Z][a-z]+\s+[A-Z][a-z]+/) && line.length < 50 && line.length > 5 && !line.match(/Session|Break|Timetable/i)) {
+      // Exclude lines with "Term", "Timetable", "Session", "Break", address patterns
+      if (line.match(/^[A-Z][a-z]+\s+[A-Z][a-z]+/) && 
+          line.length < 50 && 
+          line.length > 5 && 
+          !line.match(/Session|Break|Timetable|Term|AY\s*\d{2}|KG\s*\d+|Ave\s*\d+|Kigali|College/i)) {
         teacherName = line;
         break;
       }
@@ -354,39 +400,85 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
       /Session\s*4/i,
     ];
 
-    // Look for timetable grid structure
-    let currentDay = '';
-    const dayLineIndices: number[] = [];
-    
-    // Find lines that contain day abbreviations
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].toLowerCase();
-      for (const [key, value] of Object.entries(dayMap)) {
-        if (line.includes(key) && line.length < 30) {
-          dayLineIndices.push(i);
-          break;
-        }
+    // Helper function to check if a line is a valid course
+    const isValidCourse = (line: string): boolean => {
+      // Exclude Kepler address
+      if (line.match(/Kepler\s+College|KG\s*\d+\s+Ave|Kigali/i)) {
+        return false;
       }
-    }
+      
+      // Exclude break lines
+      if (line.toLowerCase().includes('break')) {
+        return false;
+      }
+      
+      // Exclude lines that are just session labels
+      if (line.match(/^Session\s*\d\s*$/i)) {
+        return false;
+      }
+      
+      // Exclude lines that are just time ranges
+      if (line.match(/^\d{1,2}:\d{2}\s*[-–]\s*\d{1,2}:\d{2}$/)) {
+        return false;
+      }
+      
+      // Valid courses typically contain:
+      // - Course names with hyphens (Office Hours-Fundamentals...)
+      // - Academic year (AY 25/26)
+      // - Program codes (BsBA, BAPM)
+      // - Section info (Section B)
+      if (line.match(/AY\s*\d{2}\/\d{2}|Section\s+[A-Z]|BA[A-Z]{2,}|Bs[A-Z]{2,}/i)) {
+        return true;
+      }
+      
+      // Or longer descriptive course names
+      if (line.length > 20 && line.match(/[A-Z][a-z]+.*[A-Z][a-z]+/)) {
+        return true;
+      }
+      
+      return false;
+    };
+
+    // Helper function to extract classroom from a line
+    const extractClassroom = (line: string): string => {
+      // Match patterns like "Musanze Classroom", "Burera Classroom", etc.
+      const classroomMatch = line.match(/(Gasabo|Kirehe|Musanze|Burera|Muhanga)\s+Classroom/i);
+      if (classroomMatch) {
+        return classroomMatch[0];
+      }
+      
+      // Fallback to any line containing "Classroom" or "Room"
+      if (line.match(/Classroom|Room/i)) {
+        return line;
+      }
+      
+      return '';
+    };
+
+    // Helper function to validate time is within operational hours (8:00-18:15)
+    const isValidTime = (time: string): boolean => {
+      const [hours, minutes] = time.split(':').map(Number);
+      const totalMinutes = hours * 60 + minutes;
+      const startMinutes = 8 * 60; // 8:00
+      const endMinutes = 18 * 60 + 15; // 18:15
+      return totalMinutes >= startMinutes && totalMinutes <= endMinutes;
+    };
 
     // Look for timetable entries in the text
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       
-      // Try to match time patterns (Session 1: 8:00-9:00, etc.)
+      // Try to match time patterns within operational hours (8:00-18:15)
       const timeMatch = line.match(/(\d{1,2}:\d{2})\s*[-–to]+\s*(\d{1,2}:\d{2})/i);
       
       if (timeMatch) {
         const startTime = timeMatch[1];
         const endTime = timeMatch[2];
         
-        // Look for session number
-        let sessionNum = 0;
-        sessionPatterns.forEach((pattern, idx) => {
-          if (line.match(pattern)) {
-            sessionNum = idx + 1;
-          }
-        });
+        // Validate times are within operational hours
+        if (!isValidTime(startTime) || !isValidTime(endTime)) {
+          continue;
+        }
         
         // Look for day in current or nearby lines
         let day = '';
@@ -401,37 +493,23 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
           if (day) break;
         }
 
-        // Look for course name (usually in surrounding lines or same section)
+        // Look for course name and classroom in surrounding lines
         let course = '';
         let classroom = '';
         
-        // Search within a window around the time entry
-        for (let j = Math.max(0, i - 5); j < Math.min(lines.length, i + 5); j++) {
+        // Search within a larger window around the time entry
+        for (let j = Math.max(0, i - 8); j < Math.min(lines.length, i + 8); j++) {
           const nearbyLine = lines[j];
           
-          // Skip lines that are just times, breaks, or session labels
-          if (nearbyLine.match(/^\d{1,2}:\d{2}/) || 
-              nearbyLine.toLowerCase().includes('break') ||
-              nearbyLine.match(/^Session\s*\d/i)) {
-            continue;
-          }
-          
-          // Look for course-like content (longer text with no time)
-          if (nearbyLine.length > 10 && 
-              !nearbyLine.match(/\d{1,2}:\d{2}/) &&
-              !course) {
-            // Check if it looks like a course name (contains words like "AY", section info, etc.)
-            if (nearbyLine.match(/[A-Z]{2,}/) || 
-                nearbyLine.match(/Section|BA|Bs|AY/i) ||
-                nearbyLine.length > 20) {
-              course = nearbyLine;
-            }
+          // Look for course-like content
+          if (!course && isValidCourse(nearbyLine)) {
+            course = nearbyLine;
           }
           
           // Look for classroom info
-          if (nearbyLine.match(/Classroom|Room/i) ||
-              nearbyLine.match(/^(Gasabo|Kirehe|Musanze|Burera|Muhanga)/i)) {
-            classroom = nearbyLine;
+          const extractedClassroom = extractClassroom(nearbyLine);
+          if (!classroom && extractedClassroom) {
+            classroom = extractedClassroom;
           }
         }
 
