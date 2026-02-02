@@ -43,8 +43,8 @@ router.post('/', async (req, res) => {
   try {
     const { name, email, department, courses } = req.body;
 
-    // Generate random password
-    const generatedPassword = generatePassword();
+    // Use default password for new teachers
+    const generatedPassword = 'Teacher@123';
     const hashedPassword = await bcrypt.hash(generatedPassword, 10);
 
     const teacher = await prisma.user.create({

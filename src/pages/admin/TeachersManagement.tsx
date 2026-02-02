@@ -230,7 +230,7 @@ export default function TeachersManagement() {
                   />
                 </div>
                 <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-sm text-muted-foreground">
-                  ℹ️ A secure password will be automatically generated for this teacher.
+                  ℹ️ The default password "Teacher@123" will be assigned to this teacher.
                 </div>
                 <div className="flex justify-end gap-3 pt-4">
                   <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
