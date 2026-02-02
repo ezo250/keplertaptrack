@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
+import Tesseract from 'tesseract.js';
+import * as pdfjsLib from 'pdfjs-dist';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -18,9 +20,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Upload, FileText, CheckCircle, XCircle, Download } from 'lucide-react';
+import { Upload, FileText, CheckCircle, XCircle, Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { TimetableEntry } from '@/types';
+
+// Set up PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 interface ParsedTimetableEntry {
   teacherId?: string;
@@ -42,6 +47,8 @@ interface TimetableUploadProps {
 export default function TimetableUpload({ teachers, onUploadComplete }: TimetableUploadProps) {
   const [parsedData, setParsedData] = useState<ParsedTimetableEntry[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -278,7 +285,175 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
     reader.readAsArrayBuffer(file);
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const parseOCRText = (text: string): ParsedTimetableEntry[] => {
+    const entries: ParsedTimetableEntry[] = [];
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+    
+    // Map day abbreviations to full names
+    const dayMap: Record<string, string> = {
+      'mo': 'Monday', 'mon': 'Monday', 'monday': 'Monday',
+      'tu': 'Tuesday', 'tue': 'Tuesday', 'tuesday': 'Tuesday',
+      'we': 'Wednesday', 'wed': 'Wednesday', 'wednesday': 'Wednesday',
+      'th': 'Thursday', 'thu': 'Thursday', 'thursday': 'Thursday',
+      'fr': 'Friday', 'fri': 'Friday', 'friday': 'Friday',
+    };
+
+    let teacherName = '';
+    
+    // Try to find teacher name (usually in first few lines, contains full name pattern)
+    for (let i = 0; i < Math.min(5, lines.length); i++) {
+      const line = lines[i];
+      // Look for name pattern (First Last) or (Title First Last)
+      if (line.match(/^[A-Z][a-z]+\s+[A-Z][a-z]+/) && line.length < 50 && !line.match(/\d/)) {
+        teacherName = line;
+        break;
+      }
+    }
+
+    // Look for timetable entries in the text
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      
+      // Try to match time patterns
+      const timeMatch = line.match(/(\d{1,2}:\d{2})\s*[-–to]+\s*(\d{1,2}:\d{2})/);
+      
+      if (timeMatch) {
+        const startTime = timeMatch[1];
+        const endTime = timeMatch[2];
+        
+        // Look for day in current or nearby lines
+        let day = '';
+        for (let j = Math.max(0, i - 2); j < Math.min(lines.length, i + 3); j++) {
+          const nearbyLine = lines[j].toLowerCase();
+          for (const [key, value] of Object.entries(dayMap)) {
+            if (nearbyLine.includes(key)) {
+              day = value;
+              break;
+            }
+          }
+          if (day) break;
+        }
+
+        // Look for course name (usually before or after time)
+        let course = '';
+        let classroom = '';
+        
+        // Check line before time
+        if (i > 0 && !lines[i - 1].match(/\d{1,2}:\d{2}/) && lines[i - 1].length > 3) {
+          course = lines[i - 1];
+        }
+        // Check line after time
+        else if (i < lines.length - 1 && !lines[i + 1].match(/\d{1,2}:\d{2}/) && lines[i + 1].length > 3) {
+          course = lines[i + 1];
+        }
+        // Check same line (remove time part)
+        else {
+          const courseMatch = line.replace(/\d{1,2}:\d{2}\s*[-–to]+\s*\d{1,2}:\d{2}/, '').trim();
+          if (courseMatch.length > 3) {
+            course = courseMatch;
+          }
+        }
+
+        // Look for classroom info nearby
+        for (let j = Math.max(0, i - 2); j < Math.min(lines.length, i + 3); j++) {
+          const nearbyLine = lines[j];
+          if (nearbyLine.toLowerCase().includes('room') || nearbyLine.toLowerCase().includes('classroom')) {
+            classroom = nearbyLine;
+            break;
+          }
+        }
+
+        if (day && course) {
+          entries.push({
+            teacherName: teacherName,
+            course: course,
+            classroom: classroom,
+            day: day,
+            startTime: startTime,
+            endTime: endTime,
+            isValid: true,
+            errors: [],
+          });
+        }
+      }
+    }
+
+    return entries;
+  };
+
+  const parsePDF = async (file: File) => {
+    setIsProcessing(true);
+    setProcessingProgress('Loading PDF...');
+    
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      
+      setProcessingProgress(`Processing ${pdf.numPages} page(s)...`);
+      
+      const allEntries: ParsedTimetableEntry[] = [];
+      
+      // Process each page
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        setProcessingProgress(`Processing page ${pageNum} of ${pdf.numPages}...`);
+        
+        const page = await pdf.getPage(pageNum);
+        const viewport = page.getViewport({ scale: 2.0 });
+        
+        // Create canvas to render PDF page
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        
+        if (context) {
+          await page.render({
+            canvasContext: context,
+            viewport: viewport,
+            canvas: canvas,
+          }).promise;
+          
+          // Convert canvas to blob for OCR
+          const blob = await new Promise<Blob>((resolve) => {
+            canvas.toBlob((blob) => resolve(blob!), 'image/png');
+          });
+          
+          setProcessingProgress(`Running OCR on page ${pageNum}...`);
+          
+          // Run OCR on the page
+          const result = await Tesseract.recognize(blob, 'eng', {
+            logger: (m) => {
+              if (m.status === 'recognizing text') {
+                setProcessingProgress(
+                  `OCR progress on page ${pageNum}: ${Math.round(m.progress * 100)}%`
+                );
+              }
+            },
+          });
+          
+          // Parse the extracted text
+          const pageEntries = parseOCRText(result.data.text);
+          allEntries.push(...pageEntries);
+        }
+      }
+      
+      // Validate all entries
+      const validated = allEntries.map(validateEntry);
+      setParsedData(validated);
+      
+      const validCount = validated.filter(e => e.isValid).length;
+      toast.success(`Extracted ${validCount} valid entries from ${validated.length} total from PDF`);
+      
+    } catch (error: any) {
+      toast.error(`Failed to process PDF: ${error.message}`);
+      console.error('PDF processing error:', error);
+    } finally {
+      setIsProcessing(false);
+      setProcessingProgress('');
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -288,8 +463,10 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
       parseCSV(file);
     } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
       parseExcel(file);
+    } else if (fileExtension === 'pdf') {
+      await parsePDF(file);
     } else {
-      toast.error('Please upload a CSV or Excel file');
+      toast.error('Please upload a CSV, Excel, or PDF file');
     }
 
     // Reset file input
@@ -366,7 +543,7 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
               <div>
                 <CardTitle>Timetable Upload</CardTitle>
                 <CardDescription>
-                  Upload timetable from CSV or Excel file. The system will automatically match teachers and validate entries.
+                  Upload timetable from CSV, Excel, or PDF file. The system will automatically match teachers and validate entries.
                 </CardDescription>
               </div>
             </div>
@@ -382,27 +559,47 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv,.xlsx,.xls"
+              accept=".csv,.xlsx,.xls,.pdf"
               onChange={handleFileUpload}
               className="hidden"
               id="timetable-upload"
+              disabled={isProcessing}
             />
             <label htmlFor="timetable-upload" className="cursor-pointer">
               <div className="flex flex-col items-center gap-3">
                 <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                  <FileText className="w-8 h-8 text-primary" />
+                  {isProcessing ? (
+                    <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                  ) : (
+                    <FileText className="w-8 h-8 text-primary" />
+                  )}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-foreground">
-                    Click to upload or drag and drop
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    CSV or Excel files only
-                  </p>
+                  {isProcessing ? (
+                    <>
+                      <p className="text-sm font-medium text-foreground">
+                        Processing...
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {processingProgress}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm font-medium text-foreground">
+                        Click to upload or drag and drop
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        CSV, Excel, or PDF files
+                      </p>
+                    </>
+                  )}
                 </div>
-                <Button type="button" variant="outline" size="sm">
-                  Select File
-                </Button>
+                {!isProcessing && (
+                  <Button type="button" variant="outline" size="sm">
+                    Select File
+                  </Button>
+                )}
               </div>
             </label>
           </div>
@@ -434,6 +631,18 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
                   • Course information in grid cells
                 </div>
               </div>
+              <div className="mt-2 text-xs text-muted-foreground">
+                <div className="font-medium">3. PDF Format (with OCR):</div>
+                <div className="pl-4">
+                  • Scanned or digital timetables
+                  <br />
+                  • System will extract text using OCR
+                  <br />
+                  • Looks for teacher names, days, times, and courses
+                  <br />
+                  • Processing may take longer for multiple pages
+                </div>
+              </div>
             </div>
           </div>
 
@@ -458,56 +667,62 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
                   disabled={validCount === 0 || isUploading}
                   className="gap-2"
                 >
-                  <Upload className="w-4 h-4" />
+                  {isUploading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Upload className="w-4 h-4" />
+                  )}
                   {isUploading ? 'Uploading...' : `Upload ${validCount} Entries`}
                 </Button>
               </div>
 
               <div className="border border-border/50 rounded-lg overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[50px]">Status</TableHead>
-                      <TableHead>Teacher</TableHead>
-                      <TableHead>Course</TableHead>
-                      <TableHead>Day</TableHead>
-                      <TableHead>Time</TableHead>
-                      <TableHead>Classroom</TableHead>
-                      <TableHead>Issues</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {parsedData.map((entry, index) => (
-                      <TableRow key={index} className={!entry.isValid ? 'bg-destructive/5' : ''}>
-                        <TableCell>
-                          {entry.isValid ? (
-                            <CheckCircle className="w-4 h-4 text-success" />
-                          ) : (
-                            <XCircle className="w-4 h-4 text-destructive" />
-                          )}
-                        </TableCell>
-                        <TableCell className="font-medium">{entry.teacherName}</TableCell>
-                        <TableCell>{entry.course}</TableCell>
-                        <TableCell>{entry.day}</TableCell>
-                        <TableCell className="text-sm">
-                          {entry.startTime} - {entry.endTime}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {entry.classroom || '-'}
-                        </TableCell>
-                        <TableCell>
-                          {entry.errors.length > 0 ? (
-                            <div className="text-xs text-destructive">
-                              {entry.errors.join(', ')}
-                            </div>
-                          ) : (
-                            <span className="text-xs text-success">Valid</span>
-                          )}
-                        </TableCell>
+                <div className="max-h-[500px] overflow-y-auto">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-background z-10">
+                      <TableRow>
+                        <TableHead className="w-[50px]">Status</TableHead>
+                        <TableHead>Teacher</TableHead>
+                        <TableHead>Course</TableHead>
+                        <TableHead>Day</TableHead>
+                        <TableHead>Time</TableHead>
+                        <TableHead>Classroom</TableHead>
+                        <TableHead>Issues</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {parsedData.map((entry, index) => (
+                        <TableRow key={index} className={!entry.isValid ? 'bg-destructive/5' : ''}>
+                          <TableCell>
+                            {entry.isValid ? (
+                              <CheckCircle className="w-4 h-4 text-success" />
+                            ) : (
+                              <XCircle className="w-4 h-4 text-destructive" />
+                            )}
+                          </TableCell>
+                          <TableCell className="font-medium">{entry.teacherName}</TableCell>
+                          <TableCell>{entry.course}</TableCell>
+                          <TableCell>{entry.day}</TableCell>
+                          <TableCell className="text-sm">
+                            {entry.startTime} - {entry.endTime}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {entry.classroom || '-'}
+                          </TableCell>
+                          <TableCell>
+                            {entry.errors.length > 0 ? (
+                              <div className="text-xs text-destructive">
+                                {entry.errors.join(', ')}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-success">Valid</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             </>
           )}
