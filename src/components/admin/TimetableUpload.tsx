@@ -24,8 +24,8 @@ import { Upload, FileText, CheckCircle, XCircle, Download, Loader2 } from 'lucid
 import { toast } from 'sonner';
 import { TimetableEntry } from '@/types';
 
-// Set up PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Set up PDF.js worker from public directory
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 interface ParsedTimetableEntry {
   teacherId?: string;
@@ -49,6 +49,7 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingProgress, setProcessingProgress] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -407,11 +408,11 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
         canvas.width = viewport.width;
         
         if (context) {
-          await page.render({
+          const renderContext = {
             canvasContext: context,
             viewport: viewport,
-            canvas: canvas,
-          }).promise;
+          } as any;
+          await page.render(renderContext).promise;
           
           // Convert canvas to blob for OCR
           const blob = await new Promise<Blob>((resolve) => {
@@ -453,10 +454,7 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
     }
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
+  const processFile = async (file: File) => {
     const fileExtension = file.name.split('.').pop()?.toLowerCase();
     
     if (fileExtension === 'csv') {
@@ -468,11 +466,45 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
     } else {
       toast.error('Please upload a CSV, Excel, or PDF file');
     }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    await processFile(file);
 
     // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      await processFile(file);
+    }
+  };
+
+  const handleButtonClick = () => {
+    fileInputRef.current?.click();
   };
 
   const handleUploadToSystem = async () => {
@@ -555,7 +587,16 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Upload Section */}
-          <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
+          <div 
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+              isDragging 
+                ? 'border-primary bg-primary/5' 
+                : 'border-border'
+            }`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
             <input
               ref={fileInputRef}
               type="file"
@@ -565,43 +606,46 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
               id="timetable-upload"
               disabled={isProcessing}
             />
-            <label htmlFor="timetable-upload" className="cursor-pointer">
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                  {isProcessing ? (
-                    <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                  ) : (
-                    <FileText className="w-8 h-8 text-primary" />
-                  )}
-                </div>
-                <div>
-                  {isProcessing ? (
-                    <>
-                      <p className="text-sm font-medium text-foreground">
-                        Processing...
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {processingProgress}
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-sm font-medium text-foreground">
-                        Click to upload or drag and drop
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        CSV, Excel, or PDF files
-                      </p>
-                    </>
-                  )}
-                </div>
-                {!isProcessing && (
-                  <Button type="button" variant="outline" size="sm">
-                    Select File
-                  </Button>
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                {isProcessing ? (
+                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                ) : (
+                  <FileText className="w-8 h-8 text-primary" />
                 )}
               </div>
-            </label>
+              <div>
+                {isProcessing ? (
+                  <>
+                    <p className="text-sm font-medium text-foreground">
+                      Processing...
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {processingProgress}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium text-foreground">
+                      {isDragging ? 'Drop file here' : 'Click to upload or drag and drop'}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      CSV, Excel, or PDF files
+                    </p>
+                  </>
+                )}
+              </div>
+              {!isProcessing && (
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleButtonClick}
+                >
+                  Select File
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* File Format Info */}
