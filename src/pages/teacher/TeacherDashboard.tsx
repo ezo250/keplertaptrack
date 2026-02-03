@@ -11,6 +11,7 @@ import ChangePasswordModal from '@/components/modals/ChangePasswordModal';
 import DeviceRestrictionModal from '@/components/modals/DeviceRestrictionModal';
 import QRScanner from '@/components/teacher/QRScanner';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
@@ -30,7 +31,8 @@ import {
   MapPin,
   GraduationCap,
   RefreshCw,
-  QrCode
+  QrCode,
+  Search
 } from 'lucide-react';
 import { Device } from '@/types';
 import { qrCodeAPI } from '@/services/api';
@@ -59,6 +61,7 @@ export default function TeacherDashboard() {
   const [qrScanMode, setQrScanMode] = useState<'pickup' | 'return'>('pickup');
   const [qrError, setQrError] = useState('');
   const [isVerifyingQR, setIsVerifyingQR] = useState(false);
+  const [deviceSearchQuery, setDeviceSearchQuery] = useState('');
 
   const isCodeValidForMode = (code: string, mode: 'pickup' | 'return') => {
     if (!code) return false;
@@ -71,6 +74,11 @@ export default function TeacherDashboard() {
   const availableDevices = getAvailableDevices();
   const myDevices = getUserDevices(user?.id || '');
   const mySchedule = timetable.filter(t => t.teacherId === user?.id);
+
+  // Filter available devices based on search query
+  const filteredAvailableDevices = availableDevices.filter(d =>
+    d.deviceId.toLowerCase().includes(deviceSearchQuery.toLowerCase())
+  );
   
   // Get current day
   const currentDay = new Date().toLocaleDateString('en-US', { weekday: 'long' });
@@ -575,7 +583,10 @@ export default function TeacherDashboard() {
       </div>
 
       {/* Pickup Dialog - Mobile Optimized */}
-      <Dialog open={isPickupDialogOpen} onOpenChange={setIsPickupDialogOpen}>
+      <Dialog open={isPickupDialogOpen} onOpenChange={(open) => {
+        setIsPickupDialogOpen(open);
+        if (!open) setDeviceSearchQuery('');
+      }}>
         <DialogContent className="max-w-[95vw] sm:max-w-lg w-full p-4 sm:p-6">
           <DialogHeader className="space-y-2">
             <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
@@ -587,26 +598,41 @@ export default function TeacherDashboard() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search devices..."
+                value={deviceSearchQuery}
+                onChange={(e) => setDeviceSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[400px] sm:max-h-[300px] overflow-y-auto">
-              {availableDevices.map((device) => (
-                <motion.button
-                  key={device.id}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => handlePickupClick(device)}
-                  className="p-5 sm:p-4 rounded-lg border-2 sm:border border-border hover:border-primary hover:bg-primary/5 active:bg-primary/10 transition-all text-left"
-                >
-                  <div className="flex items-center gap-4 sm:gap-3">
-                    <div className="w-14 h-14 sm:w-10 sm:h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Tablet className="w-7 h-7 sm:w-5 sm:h-5 text-primary" />
+              {filteredAvailableDevices.length === 0 ? (
+                <div className="col-span-full text-center py-8 text-muted-foreground">
+                  {deviceSearchQuery ? `No devices found matching "${deviceSearchQuery}"` : 'No available devices'}
+                </div>
+              ) : (
+                filteredAvailableDevices.map((device) => (
+                  <motion.button
+                    key={device.id}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handlePickupClick(device)}
+                    className="p-5 sm:p-4 rounded-lg border-2 sm:border border-border hover:border-primary hover:bg-primary/5 active:bg-primary/10 transition-all text-left"
+                  >
+                    <div className="flex items-center gap-4 sm:gap-3">
+                      <div className="w-14 h-14 sm:w-10 sm:h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <Tablet className="w-7 h-7 sm:w-5 sm:h-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-base sm:text-sm">{device.deviceId}</p>
+                        <p className="text-sm sm:text-xs text-success font-medium">Available</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-base sm:text-sm">{device.deviceId}</p>
-                      <p className="text-sm sm:text-xs text-success font-medium">Available</p>
-                    </div>
-                  </div>
-                </motion.button>
-              ))}
+                  </motion.button>
+                ))
+              )}
             </div>
           </div>
         </DialogContent>

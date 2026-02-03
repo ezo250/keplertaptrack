@@ -7,8 +7,9 @@ import DeviceCard from '@/components/dashboard/DeviceCard';
 import QRCodeManagement from '@/components/admin/QRCodeManagement';
 import TimetableUpload from '@/components/admin/TimetableUpload';
 import DeviceStatisticsCards from '@/components/admin/DeviceStatisticsCards';
-import { Tablet, Users, CheckCircle, AlertTriangle, Clock, ArrowRight, QrCode, Upload, BarChart3, RefreshCw } from 'lucide-react';
+import { Tablet, Users, CheckCircle, AlertTriangle, Clock, ArrowRight, QrCode, Upload, BarChart3, RefreshCw, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -18,10 +19,17 @@ export default function AdminDashboard() {
   const { devices, teachers, timetable, getAvailableDevices, getDevicesInUse, getOverdueDevices, deviceHistory, addTimetableEntry } = useData();
   const [activeTab, setActiveTab] = useState('overview');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const availableCount = getAvailableDevices().length;
   const inUseCount = getDevicesInUse().length;
   const overdueCount = getOverdueDevices().length;
+
+  // Filter devices based on search query
+  const filteredDevices = devices.filter(d =>
+    d.deviceId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    d.currentUserName?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   // Get recent activity
   const recentActivity = deviceHistory
@@ -176,26 +184,42 @@ export default function AdminDashboard() {
                 transition={{ delay: 0.5 }}
                 className="lg:col-span-2 bg-card rounded-xl border border-border/50 p-6"
               >
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                   <div>
                     <h2 className="text-xl font-heading font-semibold text-foreground">Devices Overview</h2>
                     <p className="text-sm text-muted-foreground">Current status of all devices</p>
                   </div>
-                  <Link to="/admin/devices">
-                    <Button variant="outline" size="sm">
-                      View All <ArrowRight className="w-4 h-4 ml-2" />
-                    </Button>
-                  </Link>
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <div className="relative flex-1 sm:flex-none sm:w-64">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search devices..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10 h-9"
+                      />
+                    </div>
+                    <Link to="/admin/devices">
+                      <Button variant="outline" size="sm">
+                        View All <ArrowRight className="w-4 h-4 ml-2" />
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-                  {devices.slice(0, 6).map((device, index) => (
+                  {filteredDevices.slice(0, 6).map((device, index) => (
                     <DeviceCard 
                       key={device.id} 
                       device={device} 
                       delay={0.6 + index * 0.05}
                     />
                   ))}
+                  {filteredDevices.length === 0 && (
+                    <div className="col-span-full text-center py-8 text-muted-foreground">
+                      No devices found matching "{searchQuery}"
+                    </div>
+                  )}
                 </div>
               </motion.div>
 
