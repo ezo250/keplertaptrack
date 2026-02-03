@@ -75,9 +75,47 @@ router.post('/', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Check if teacher exists
+    const teacher = await prisma.user.findUnique({
+      where: { id },
+    });
+    
+    if (!teacher) {
+      return res.status(404).json({ error: 'Teacher not found' });
+    }
+    
+    // Delete related records first (cascade delete)
+    // Delete notifications
+    await prisma.notification.deleteMany({
+      where: { userId: id },
+    });
+    
+    // Delete device history
+    await prisma.deviceHistory.deleteMany({
+      where: { userId: id },
+    });
+    
+    // Update devices to remove reference to this teacher
+    await prisma.device.updateMany({
+      where: { currentUserId: id },
+      data: { 
+        currentUserId: null,
+        currentUserName: null,
+        status: 'available',
+      },
+    });
+    
+    // Delete timetable entries for this teacher
+    await prisma.timetableEntry.deleteMany({
+      where: { teacherId: id },
+    });
+    
+    // Finally delete the teacher
     await prisma.user.delete({
       where: { id },
     });
+    
     res.json({ message: 'Teacher deleted successfully' });
   } catch (error) {
     console.error('Delete teacher error:', error);

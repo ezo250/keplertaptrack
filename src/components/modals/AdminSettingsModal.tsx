@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -104,6 +105,9 @@ export default function AdminSettingsModal({
             <User className="w-5 h-5 text-primary" />
             Account Settings
           </DialogTitle>
+          <DialogDescription>
+            Manage your profile and security settings
+          </DialogDescription>
         </DialogHeader>
         
         <Tabs defaultValue="profile" className="pt-4">

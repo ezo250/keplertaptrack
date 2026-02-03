@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -44,7 +45,7 @@ export default function TimetableManagement() {
     teacherName: '',
     course: '',
     classroom: '',
-    day: '' as 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | '',
+    day: '' as 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday' | '',
     startTime: '',
     endTime: '',
   });
@@ -199,6 +200,9 @@ export default function TimetableManagement() {
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Add Timetable Entry</DialogTitle>
+                <DialogDescription>
+                  Create a new class schedule entry
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 pt-4">
                 <div className="space-y-2">
@@ -431,6 +435,9 @@ export default function TimetableManagement() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Timetable Entry</DialogTitle>
+            <DialogDescription>
+              Update class schedule details
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-4">
             <div className="space-y-2">

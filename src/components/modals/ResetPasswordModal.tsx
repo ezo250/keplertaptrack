@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -62,6 +63,9 @@ export default function ResetPasswordModal({
             <Key className="w-5 h-5 text-primary" />
             Reset Teacher Password
           </DialogTitle>
+          <DialogDescription>
+            Generate a new password for {teacherName}
+          </DialogDescription>
         </DialogHeader>
         
         <motion.div

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
 } from '@/components/ui/dialog';
 
 interface PickupSuccessModalProps {
@@ -16,7 +17,10 @@ interface PickupSuccessModalProps {
 export default function PickupSuccessModal({ isOpen, onClose, deviceId }: PickupSuccessModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md text-center border-0 bg-gradient-to-br from-primary to-primary/90">
+      <DialogContent className="sm:max-w-md text-center border-0 bg-gradient-to-br from-primary to-primary/90" aria-describedby="pickup-success-desc">
+        <DialogDescription id="pickup-success-desc" className="sr-only">
+          Device {deviceId} has been successfully picked up
+        </DialogDescription>
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}

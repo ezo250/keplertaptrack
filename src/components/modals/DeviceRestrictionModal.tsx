@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
 } from '@/components/ui/dialog';
 
 interface DeviceRestrictionModalProps {
@@ -20,7 +21,10 @@ export default function DeviceRestrictionModal({
 }: DeviceRestrictionModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md text-center border-0 bg-gradient-to-br from-amber-500 to-orange-500">
+      <DialogContent className="sm:max-w-md text-center border-0 bg-gradient-to-br from-amber-500 to-orange-500" aria-describedby="device-restriction-desc">
+        <DialogDescription id="device-restriction-desc" className="sr-only">
+          You already have a device. Please return it before picking up another one
+        </DialogDescription>
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}

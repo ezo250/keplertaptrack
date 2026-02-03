@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -40,6 +41,9 @@ export default function PasswordGeneratedModal({
             <CheckCircle className="w-5 h-5" />
             Teacher Added Successfully
           </DialogTitle>
+          <DialogDescription>
+            Save the auto-generated password for {teacherName}
+          </DialogDescription>
         </DialogHeader>
         
         <motion.div

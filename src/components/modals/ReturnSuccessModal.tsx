@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
 } from '@/components/ui/dialog';
 
 interface ReturnSuccessModalProps {
@@ -16,7 +17,10 @@ interface ReturnSuccessModalProps {
 export default function ReturnSuccessModal({ isOpen, onClose, deviceId }: ReturnSuccessModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md text-center border-0 bg-gradient-to-br from-secondary to-secondary/90">
+      <DialogContent className="sm:max-w-md text-center border-0 bg-gradient-to-br from-secondary to-secondary/90" aria-describedby="return-success-desc">
+        <DialogDescription id="return-success-desc" className="sr-only">
+          Device {deviceId} has been successfully returned
+        </DialogDescription>
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}

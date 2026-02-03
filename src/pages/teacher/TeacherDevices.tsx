@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -248,6 +249,9 @@ export default function TeacherDevices() {
               <ArrowUp className="w-5 h-5 text-primary" />
               Confirm Pickup
             </DialogTitle>
+            <DialogDescription>
+              Confirm device pickup and scan QR code
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-4">
             <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/50">

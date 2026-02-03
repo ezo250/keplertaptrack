@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -68,6 +69,9 @@ export default function ChangePasswordModal({
             <Lock className="w-5 h-5 text-primary" />
             Change Password
           </DialogTitle>
+          <DialogDescription>
+            Update your account password securely
+          </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4 pt-4">

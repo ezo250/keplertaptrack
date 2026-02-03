@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -190,6 +191,9 @@ export default function TeachersManagement() {
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Add New Teacher</DialogTitle>
+                <DialogDescription>
+                  Create a new teacher account with auto-generated credentials
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 pt-4">
                 <div className="space-y-2">
@@ -357,6 +361,9 @@ export default function TeachersManagement() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Teacher</DialogTitle>
+            <DialogDescription>
+              Update teacher information and course assignments
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-4">
             <div className="space-y-2">

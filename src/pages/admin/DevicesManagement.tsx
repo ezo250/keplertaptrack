@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -178,6 +179,9 @@ export default function DevicesManagement() {
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Add New Device</DialogTitle>
+                <DialogDescription>
+                  Register a new device to the system
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 pt-4">
                 <div className="space-y-2">
@@ -263,6 +267,9 @@ export default function DevicesManagement() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Device</DialogTitle>
+            <DialogDescription>
+              Update device identifier
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-4">
             <div className="space-y-2">

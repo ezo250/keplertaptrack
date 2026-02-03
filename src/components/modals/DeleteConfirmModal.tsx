@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -39,6 +40,9 @@ export default function DeleteConfirmModal({
             <AlertTriangle className="w-5 h-5" />
             {title}
           </DialogTitle>
+          <DialogDescription>
+            {description}
+          </DialogDescription>
         </DialogHeader>
         
         <motion.div
@@ -58,9 +62,8 @@ export default function DeleteConfirmModal({
             </motion.div>
           </div>
 
-          {/* Description */}
+          {/* Item Name */}
           <div className="text-center space-y-2">
-            <p className="text-muted-foreground">{description}</p>
             {itemName && (
               <p className="font-semibold text-foreground text-lg">"{itemName}"</p>
             )}
