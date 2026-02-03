@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 import Tesseract from 'tesseract.js';
 import * as pdfjsLib from 'pdfjs-dist';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Card,
   CardContent,
@@ -20,6 +21,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { AlertCircle, ArrowRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -28,7 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Upload, FileText, CheckCircle, XCircle, Download, Loader2, Edit2, Trash2, Plus, Save } from 'lucide-react';
+import { Upload, FileText, CheckCircle, XCircle, Download, Loader2, Edit2, Trash2, Plus, Save, GitCompare } from 'lucide-react';
 import { toast } from 'sonner';
 import { TimetableEntry } from '@/types';
 
@@ -47,6 +56,23 @@ interface ParsedTimetableEntry {
   errors: string[];
 }
 
+interface ComparisonResult {
+  new: ParsedTimetableEntry[];
+  conflicts: Array<{
+    uploaded: ParsedTimetableEntry;
+    existing: any;
+    conflictType: 'time_overlap' | 'different_course';
+  }>;
+  duplicates: Array<{
+    uploaded: ParsedTimetableEntry;
+    existing: any;
+  }>;
+  updates: Array<{
+    uploaded: ParsedTimetableEntry;
+    existing: any;
+  }>;
+}
+
 interface TimetableUploadProps {
   teachers: Array<{ id: string; name: string }>;
   onUploadComplete?: (entries: ParsedTimetableEntry[]) => Promise<void>;
@@ -54,10 +80,16 @@ interface TimetableUploadProps {
 
 export default function TimetableUpload({ teachers, onUploadComplete }: TimetableUploadProps) {
   const [parsedData, setParsedData] = useState<ParsedTimetableEntry[]>([]);
+  const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null);
+  const [showComparison, setShowComparison] = useState(false);
+  const [selectedNew, setSelectedNew] = useState<Set<number>>(new Set());
+  const [selectedUpdates, setSelectedUpdates] = useState<Set<number>>(new Set());
+  const [selectedConflicts, setSelectedConflicts] = useState<Set<number>>(new Set());
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingEntry, setEditingEntry] = useState<ParsedTimetableEntry | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isComparing, setIsComparing] = useState(false);
   const [processingProgress, setProcessingProgress] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -702,21 +734,101 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
     setEditingEntry(newEntry);
   };
 
-  const handleUploadToSystem = async () => {
+  const handleCompareWithSystem = async () => {
     const validEntries = parsedData.filter(e => e.isValid);
     
     if (validEntries.length === 0) {
-      toast.error('No valid entries to upload');
+      toast.error('No valid entries to compare');
+      return;
+    }
+
+    setIsComparing(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/timetable/compare`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ entries: validEntries }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to compare timetable entries');
+      }
+
+      const result: ComparisonResult = await response.json();
+      setComparisonResult(result);
+      setShowComparison(true);
+
+      // Pre-select all new entries and updates
+      setSelectedNew(new Set(result.new.map((_, i) => i)));
+      setSelectedUpdates(new Set(result.updates.map((_, i) => i)));
+
+      toast.success('Comparison complete! Review the changes before uploading.');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to compare timetable');
+    } finally {
+      setIsComparing(false);
+    }
+  };
+
+  const handleUploadToSystem = async () => {
+    if (!comparisonResult) {
+      toast.error('Please compare with system first');
+      return;
+    }
+
+    // Prepare entries to upload
+    const newEntries = comparisonResult.new.filter((_, i) => selectedNew.has(i));
+    const updateEntries = comparisonResult.updates
+      .filter((_, i) => selectedUpdates.has(i))
+      .map(update => ({
+        uploaded: update.uploaded,
+        existingId: update.existing.id,
+      }));
+
+    if (newEntries.length === 0 && updateEntries.length === 0) {
+      toast.error('No entries selected to upload');
       return;
     }
 
     setIsUploading(true);
     try {
-      if (onUploadComplete) {
-        await onUploadComplete(validEntries);
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/timetable/bulk-upload`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          newEntries,
+          updates: updateEntries,
+          skipDuplicates: true,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to upload timetable entries');
       }
-      toast.success(`Successfully uploaded ${validEntries.length} timetable entries`);
+
+      const results = await response.json();
+      
+      if (results.errors.length > 0) {
+        toast.warning(`Uploaded with errors: ${results.added} added, ${results.updated} updated. ${results.errors.length} errors.`);
+      } else {
+        toast.success(`Successfully uploaded! ${results.added} added, ${results.updated} updated.`);
+      }
+
+      if (onUploadComplete) {
+        await onUploadComplete(parsedData.filter(e => e.isValid));
+      }
+
+      // Reset state
       setParsedData([]);
+      setComparisonResult(null);
+      setShowComparison(false);
+      setSelectedNew(new Set());
+      setSelectedUpdates(new Set());
+      setSelectedConflicts(new Set());
     } catch (error: any) {
       toast.error(error.message || 'Failed to upload timetable');
     } finally {
@@ -892,45 +1004,91 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
           {/* Parsed Data Preview */}
           {parsedData.length > 0 && (
             <>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 text-sm">
-                    <CheckCircle className="w-4 h-4 text-success" />
-                    <span className="font-medium">{validCount} valid</span>
-                  </div>
-                  {invalidCount > 0 && (
+              {!showComparison ? (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 text-sm">
-                      <XCircle className="w-4 h-4 text-destructive" />
-                      <span className="font-medium">{invalidCount} invalid</span>
+                      <CheckCircle className="w-4 h-4 text-success" />
+                      <span className="font-medium">{validCount} valid</span>
                     </div>
-                  )}
+                    {invalidCount > 0 && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <XCircle className="w-4 h-4 text-destructive" />
+                        <span className="font-medium">{invalidCount} invalid</span>
+                      </div>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddEntry}
+                      className="gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Entry
+                    </Button>
+                  </div>
                   <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleAddEntry}
+                    onClick={handleCompareWithSystem}
+                    disabled={validCount === 0 || isComparing}
                     className="gap-2"
                   >
-                    <Plus className="w-4 h-4" />
-                    Add Entry
+                    {isComparing ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <GitCompare className="w-4 h-4" />
+                    )}
+                    {isComparing ? 'Comparing...' : 'Compare with System'}
                   </Button>
                 </div>
-                <Button
-                  onClick={handleUploadToSystem}
-                  disabled={validCount === 0 || isUploading}
-                  className="gap-2"
-                >
-                  {isUploading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Upload className="w-4 h-4" />
-                  )}
-                  {isUploading ? 'Uploading...' : `Upload ${validCount} Entries`}
-                </Button>
-              </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Badge variant="outline" className="gap-1">
+                      <CheckCircle className="w-3 h-3 text-green-500" />
+                      {comparisonResult?.new.length || 0} New
+                    </Badge>
+                    <Badge variant="outline" className="gap-1">
+                      <Edit2 className="w-3 h-3 text-blue-500" />
+                      {comparisonResult?.updates.length || 0} Updates
+                    </Badge>
+                    <Badge variant="outline" className="gap-1">
+                      <AlertCircle className="w-3 h-3 text-yellow-500" />
+                      {comparisonResult?.conflicts.length || 0} Conflicts
+                    </Badge>
+                    <Badge variant="outline" className="gap-1">
+                      <CheckCircle className="w-3 h-3 text-gray-500" />
+                      {comparisonResult?.duplicates.length || 0} Duplicates
+                    </Badge>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowComparison(false)}
+                    >
+                      Back to Edit
+                    </Button>
+                    <Button
+                      onClick={handleUploadToSystem}
+                      disabled={
+                        (selectedNew.size === 0 && selectedUpdates.size === 0) || isUploading
+                      }
+                      className="gap-2"
+                    >
+                      {isUploading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Upload className="w-4 h-4" />
+                      )}
+                      {isUploading ? 'Uploading...' : `Upload Selected (${selectedNew.size + selectedUpdates.size})`}
+                    </Button>
+                  </div>
+                </div>
+              )}
 
-              <div className="border border-border/50 rounded-lg overflow-hidden">
-                <div className="max-h-[600px] overflow-y-auto">
-                  <Table>
+              {!showComparison ? (
+                <div className="border border-border/50 rounded-lg overflow-hidden">
+                  <div className="max-h-[600px] overflow-y-auto">
+                    <Table>
                     <TableHeader className="sticky top-0 bg-background z-10">
                       <TableRow>
                         <TableHead className="w-[50px]">Status</TableHead>
@@ -1099,6 +1257,297 @@ export default function TimetableUpload({ teachers, onUploadComplete }: Timetabl
                   </Table>
                 </div>
               </div>
+              ) : (
+                <Tabs defaultValue="new" className="w-full">
+                  <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="new">
+                      New ({comparisonResult?.new.length || 0})
+                    </TabsTrigger>
+                    <TabsTrigger value="updates">
+                      Updates ({comparisonResult?.updates.length || 0})
+                    </TabsTrigger>
+                    <TabsTrigger value="conflicts">
+                      Conflicts ({comparisonResult?.conflicts.length || 0})
+                    </TabsTrigger>
+                    <TabsTrigger value="duplicates">
+                      Duplicates ({comparisonResult?.duplicates.length || 0})
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="new" className="mt-4">
+                    <div className="border border-border/50 rounded-lg overflow-hidden">
+                      <div className="max-h-[500px] overflow-y-auto">
+                        <Table>
+                          <TableHeader className="sticky top-0 bg-background z-10">
+                            <TableRow>
+                              <TableHead className="w-[50px]">
+                                <Checkbox
+                                  checked={selectedNew.size === (comparisonResult?.new.length || 0) && (comparisonResult?.new.length || 0) > 0}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setSelectedNew(new Set(comparisonResult?.new.map((_, i) => i) || []));
+                                    } else {
+                                      setSelectedNew(new Set());
+                                    }
+                                  }}
+                                />
+                              </TableHead>
+                              <TableHead>Teacher</TableHead>
+                              <TableHead>Course</TableHead>
+                              <TableHead>Day</TableHead>
+                              <TableHead>Time</TableHead>
+                              <TableHead>Classroom</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {comparisonResult?.new.map((entry, index) => (
+                              <TableRow key={index} className="bg-green-50 dark:bg-green-950/20">
+                                <TableCell>
+                                  <Checkbox
+                                    checked={selectedNew.has(index)}
+                                    onCheckedChange={(checked) => {
+                                      const newSelected = new Set(selectedNew);
+                                      if (checked) {
+                                        newSelected.add(index);
+                                      } else {
+                                        newSelected.delete(index);
+                                      }
+                                      setSelectedNew(newSelected);
+                                    }}
+                                  />
+                                </TableCell>
+                                <TableCell className="font-medium">{entry.teacherName}</TableCell>
+                                <TableCell className="max-w-[200px] truncate" title={entry.course}>
+                                  {entry.course}
+                                </TableCell>
+                                <TableCell>{entry.day}</TableCell>
+                                <TableCell className="text-sm">
+                                  {entry.startTime} - {entry.endTime}
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {entry.classroom || '-'}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="updates" className="mt-4">
+                    <div className="border border-border/50 rounded-lg overflow-hidden">
+                      <div className="max-h-[500px] overflow-y-auto">
+                        <Table>
+                          <TableHeader className="sticky top-0 bg-background z-10">
+                            <TableRow>
+                              <TableHead className="w-[50px]">
+                                <Checkbox
+                                  checked={selectedUpdates.size === (comparisonResult?.updates.length || 0) && (comparisonResult?.updates.length || 0) > 0}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setSelectedUpdates(new Set(comparisonResult?.updates.map((_, i) => i) || []));
+                                    } else {
+                                      setSelectedUpdates(new Set());
+                                    }
+                                  }}
+                                />
+                              </TableHead>
+                              <TableHead>Field</TableHead>
+                              <TableHead>Current (System)</TableHead>
+                              <TableHead className="w-[50px]"></TableHead>
+                              <TableHead>New (Uploaded)</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {comparisonResult?.updates.map((update, index) => (
+                              <React.Fragment key={index}>
+                                <TableRow className="bg-blue-50 dark:bg-blue-950/20">
+                                  <TableCell rowSpan={6} className="align-top">
+                                    <Checkbox
+                                      checked={selectedUpdates.has(index)}
+                                      onCheckedChange={(checked) => {
+                                        const newSelected = new Set(selectedUpdates);
+                                        if (checked) {
+                                          newSelected.add(index);
+                                        } else {
+                                          newSelected.delete(index);
+                                        }
+                                        setSelectedUpdates(newSelected);
+                                      }}
+                                    />
+                                  </TableCell>
+                                  <TableCell className="font-medium">Teacher</TableCell>
+                                  <TableCell>{update.existing.teacherName}</TableCell>
+                                  <TableCell className="text-center">
+                                    <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                                  </TableCell>
+                                  <TableCell>{update.uploaded.teacherName}</TableCell>
+                                </TableRow>
+                                <TableRow className="bg-blue-50 dark:bg-blue-950/20">
+                                  <TableCell className="font-medium">Course</TableCell>
+                                  <TableCell className={update.existing.course !== update.uploaded.course ? 'text-destructive line-through' : ''}>
+                                    {update.existing.course}
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                                  </TableCell>
+                                  <TableCell className={update.existing.course !== update.uploaded.course ? 'text-success font-medium' : ''}>
+                                    {update.uploaded.course}
+                                  </TableCell>
+                                </TableRow>
+                                <TableRow className="bg-blue-50 dark:bg-blue-950/20">
+                                  <TableCell className="font-medium">Classroom</TableCell>
+                                  <TableCell className={update.existing.classroom !== update.uploaded.classroom ? 'text-destructive line-through' : ''}>
+                                    {update.existing.classroom || '-'}
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                                  </TableCell>
+                                  <TableCell className={update.existing.classroom !== update.uploaded.classroom ? 'text-success font-medium' : ''}>
+                                    {update.uploaded.classroom || '-'}
+                                  </TableCell>
+                                </TableRow>
+                                <TableRow className="bg-blue-50 dark:bg-blue-950/20">
+                                  <TableCell className="font-medium">Day</TableCell>
+                                  <TableCell>{update.existing.day}</TableCell>
+                                  <TableCell className="text-center">
+                                    <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                                  </TableCell>
+                                  <TableCell>{update.uploaded.day}</TableCell>
+                                </TableRow>
+                                <TableRow className="bg-blue-50 dark:bg-blue-950/20">
+                                  <TableCell className="font-medium">Time</TableCell>
+                                  <TableCell>
+                                    {update.existing.startTime} - {update.existing.endTime}
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                                  </TableCell>
+                                  <TableCell>
+                                    {update.uploaded.startTime} - {update.uploaded.endTime}
+                                  </TableCell>
+                                </TableRow>
+                                <TableRow className="bg-blue-50 dark:bg-blue-950/20 border-b-2 border-border">
+                                  <TableCell colSpan={4} className="text-xs text-muted-foreground">
+                                    <div className="flex gap-2">
+                                      <Badge variant="outline" className="text-xs">ID: {update.existing.id}</Badge>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              </React.Fragment>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="conflicts" className="mt-4">
+                    <div className="border border-border/50 rounded-lg overflow-hidden">
+                      <div className="max-h-[500px] overflow-y-auto">
+                        <Table>
+                          <TableHeader className="sticky top-0 bg-background z-10">
+                            <TableRow>
+                              <TableHead>Type</TableHead>
+                              <TableHead>Teacher</TableHead>
+                              <TableHead>Course (Uploaded)</TableHead>
+                              <TableHead>Day</TableHead>
+                              <TableHead>Time (Uploaded)</TableHead>
+                              <TableHead>Conflicts With</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {comparisonResult?.conflicts.map((conflict, index) => (
+                              <TableRow key={index} className="bg-yellow-50 dark:bg-yellow-950/20">
+                                <TableCell>
+                                  <Badge variant="destructive" className="text-xs">
+                                    {conflict.conflictType === 'time_overlap' ? 'Time Overlap' : 'Different Course'}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="font-medium">{conflict.uploaded.teacherName}</TableCell>
+                                <TableCell className="max-w-[200px] truncate" title={conflict.uploaded.course}>
+                                  {conflict.uploaded.course}
+                                </TableCell>
+                                <TableCell>{conflict.uploaded.day}</TableCell>
+                                <TableCell className="text-sm">
+                                  {conflict.uploaded.startTime} - {conflict.uploaded.endTime}
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                  <div className="space-y-1">
+                                    <div className="font-medium">{conflict.existing.course}</div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {conflict.existing.startTime} - {conflict.existing.endTime}
+                                    </div>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                    {(comparisonResult?.conflicts.length || 0) > 0 && (
+                      <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900 rounded-lg">
+                        <div className="flex gap-2">
+                          <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <h4 className="font-medium text-yellow-900 dark:text-yellow-100">
+                              Conflicts Detected
+                            </h4>
+                            <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                              These entries have time overlaps with existing timetable entries for the same teacher.
+                              Please resolve conflicts manually before uploading.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="duplicates" className="mt-4">
+                    <div className="border border-border/50 rounded-lg overflow-hidden">
+                      <div className="max-h-[500px] overflow-y-auto">
+                        <Table>
+                          <TableHeader className="sticky top-0 bg-background z-10">
+                            <TableRow>
+                              <TableHead>Teacher</TableHead>
+                              <TableHead>Course</TableHead>
+                              <TableHead>Day</TableHead>
+                              <TableHead>Time</TableHead>
+                              <TableHead>Classroom</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {comparisonResult?.duplicates.map((duplicate, index) => (
+                              <TableRow key={index} className="bg-gray-50 dark:bg-gray-950/20">
+                                <TableCell className="font-medium">{duplicate.uploaded.teacherName}</TableCell>
+                                <TableCell className="max-w-[200px] truncate" title={duplicate.uploaded.course}>
+                                  {duplicate.uploaded.course}
+                                </TableCell>
+                                <TableCell>{duplicate.uploaded.day}</TableCell>
+                                <TableCell className="text-sm">
+                                  {duplicate.uploaded.startTime} - {duplicate.uploaded.endTime}
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {duplicate.uploaded.classroom || '-'}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                    {(comparisonResult?.duplicates.length || 0) > 0 && (
+                      <div className="mt-4 p-4 bg-muted border border-border rounded-lg">
+                        <p className="text-sm text-muted-foreground">
+                          These entries already exist in the system and will be skipped automatically.
+                        </p>
+                      </div>
+                    )}
+                  </TabsContent>
+                </Tabs>
+              )}
             </>
           )}
         </CardContent>
