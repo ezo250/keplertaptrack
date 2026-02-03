@@ -76,32 +76,44 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
+    console.log('Attempting to delete teacher with ID:', id);
+    
     // Check if teacher exists
     const teacher = await prisma.user.findUnique({
       where: { id },
     });
     
     if (!teacher) {
+      console.log('Teacher not found:', id);
       return res.status(404).json({ error: 'Teacher not found' });
     }
+    
+    if (teacher.role !== 'teacher') {
+      console.log('Cannot delete non-teacher user:', id);
+      return res.status(400).json({ error: 'Cannot delete non-teacher user' });
+    }
+    
+    console.log('Deleting related records for teacher:', teacher.name);
     
     // Delete related records first (cascade delete)
     try {
       // Delete notifications
-      await prisma.notification.deleteMany({
+      const deletedNotifications = await prisma.notification.deleteMany({
         where: { userId: id },
       });
-    } catch (error) {
-      console.log('No notifications to delete or notifications table does not exist');
+      console.log(`Deleted ${deletedNotifications.count} notifications`);
+    } catch (error: any) {
+      console.log('No notifications to delete or notifications table does not exist:', error.message);
     }
     
     // Delete device history
-    await prisma.deviceHistory.deleteMany({
+    const deletedHistory = await prisma.deviceHistory.deleteMany({
       where: { userId: id },
     });
+    console.log(`Deleted ${deletedHistory.count} device history entries`);
     
     // Update devices to remove reference to this teacher
-    await prisma.device.updateMany({
+    const updatedDevices = await prisma.device.updateMany({
       where: { currentUserId: id },
       data: { 
         currentUserId: null,
@@ -109,21 +121,28 @@ router.delete('/:id', async (req, res) => {
         status: 'available',
       },
     });
+    console.log(`Updated ${updatedDevices.count} devices to remove teacher reference`);
     
     // Delete timetable entries for this teacher
-    await prisma.timetableEntry.deleteMany({
+    const deletedTimetable = await prisma.timetableEntry.deleteMany({
       where: { teacherId: id },
     });
+    console.log(`Deleted ${deletedTimetable.count} timetable entries`);
     
     // Finally delete the teacher
     await prisma.user.delete({
       where: { id },
     });
     
+    console.log('Successfully deleted teacher:', teacher.name);
     res.json({ message: 'Teacher deleted successfully' });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Delete teacher error:', error);
-    res.status(500).json({ error: 'Failed to delete teacher' });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Failed to delete teacher',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
