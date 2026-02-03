@@ -86,10 +86,14 @@ router.delete('/:id', async (req, res) => {
     }
     
     // Delete related records first (cascade delete)
-    // Delete notifications
-    await prisma.notification.deleteMany({
-      where: { userId: id },
-    });
+    try {
+      // Delete notifications
+      await prisma.notification.deleteMany({
+        where: { userId: id },
+      });
+    } catch (error) {
+      console.log('No notifications to delete or notifications table does not exist');
+    }
     
     // Delete device history
     await prisma.deviceHistory.deleteMany({

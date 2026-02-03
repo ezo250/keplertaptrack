@@ -34,13 +34,13 @@ export default function DeleteConfirmModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" aria-describedby="delete-description">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-destructive">
             <AlertTriangle className="w-5 h-5" />
             {title}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription id="delete-description">
             {description}
           </DialogDescription>
         </DialogHeader>
