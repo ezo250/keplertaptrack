@@ -7,7 +7,7 @@ import DeviceCard from '@/components/dashboard/DeviceCard';
 import QRCodeManagement from '@/components/admin/QRCodeManagement';
 import TimetableUpload from '@/components/admin/TimetableUpload';
 import DeviceStatisticsCards from '@/components/admin/DeviceStatisticsCards';
-import { Tablet, Users, CheckCircle, AlertTriangle, Clock, ArrowRight, QrCode, Upload, BarChart3 } from 'lucide-react';
+import { Tablet, Users, CheckCircle, AlertTriangle, Clock, ArrowRight, QrCode, Upload, BarChart3, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Link } from 'react-router-dom';
@@ -17,6 +17,7 @@ import { QRCodeType as QRType } from '@/types';
 export default function AdminDashboard() {
   const { devices, teachers, timetable, getAvailableDevices, getDevicesInUse, getOverdueDevices, deviceHistory, addTimetableEntry } = useData();
   const [activeTab, setActiveTab] = useState('overview');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const availableCount = getAvailableDevices().length;
   const inUseCount = getDevicesInUse().length;
@@ -58,6 +59,17 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      // Trigger data refetch
+      window.dispatchEvent(new Event('focus'));
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   return (
     <div className="min-h-screen">
       <Header 
@@ -65,30 +77,52 @@ export default function AdminDashboard() {
         subtitle="Welcome back! Here's an overview of your device tracking system."
       />
       
-      <div className="p-6">
+      {/* Refresh Button */}
+      <div className="px-4 sm:px-6 pt-6">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex justify-start"
+        >
+          <Button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Refresh Data</span>
+          </Button>
+        </motion.div>
+      </div>
+      
+      <div className="p-4 sm:p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
-            <TabsTrigger value="overview" className="gap-2">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:w-auto lg:inline-grid">
+            <TabsTrigger value="overview" className="gap-1 sm:gap-2">
               <Tablet className="w-4 h-4" />
-              <span className="hidden sm:inline">Overview</span>
+              <span className="text-xs sm:text-sm">Overview</span>
             </TabsTrigger>
-            <TabsTrigger value="qr-codes" className="gap-2">
+            <TabsTrigger value="qr-codes" className="gap-1 sm:gap-2">
               <QrCode className="w-4 h-4" />
-              <span className="hidden sm:inline">QR Codes</span>
+              <span className="text-xs sm:text-sm">QR Codes</span>
             </TabsTrigger>
-            <TabsTrigger value="timetable-upload" className="gap-2">
+            <TabsTrigger value="timetable-upload" className="gap-1 sm:gap-2">
               <Upload className="w-4 h-4" />
-              <span className="hidden sm:inline">Upload Timetable</span>
+              <span className="text-xs sm:text-sm hidden sm:inline">Upload</span>
+              <span className="text-xs sm:hidden">Upload</span>
             </TabsTrigger>
-            <TabsTrigger value="device-planning" className="gap-2">
+            <TabsTrigger value="device-planning" className="gap-1 sm:gap-2">
               <BarChart3 className="w-4 h-4" />
-              <span className="hidden sm:inline">Device Planning</span>
+              <span className="text-xs sm:text-sm hidden sm:inline">Planning</span>
+              <span className="text-xs sm:hidden">Stats</span>
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-8">
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
               <StatCard
                 title="Total Devices"
                 value={devices.length}
@@ -123,7 +157,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Quick Stats Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               <StatCard
                 title="Active Teachers"
                 value={teachers.length}
@@ -134,7 +168,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Device Overview & Activity */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
               {/* Devices Overview */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -154,7 +188,7 @@ export default function AdminDashboard() {
                   </Link>
                 </div>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
                   {devices.slice(0, 6).map((device, index) => (
                     <DeviceCard 
                       key={device.id} 
