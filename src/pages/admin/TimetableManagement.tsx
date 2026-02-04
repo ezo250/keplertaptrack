@@ -29,9 +29,23 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Calendar, Clock, Plus, Edit2, Trash2, MapPin, GraduationCap } from 'lucide-react';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Calendar, Clock, Plus, Edit2, Trash2, MapPin, GraduationCap, Check, ChevronsUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { TimetableEntry } from '@/types';
+import { cn } from '@/lib/utils';
 
 export default function TimetableManagement() {
   const { timetable, teachers, addTimetableEntry, updateTimetableEntry, removeTimetableEntry } = useData();
@@ -39,6 +53,8 @@ export default function TimetableManagement() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<TimetableEntry | null>(null);
   const [deleteEntry, setDeleteEntry] = useState<{ id: string; course: string } | null>(null);
+  const [openAddTeacherCombo, setOpenAddTeacherCombo] = useState(false);
+  const [openEditTeacherCombo, setOpenEditTeacherCombo] = useState(false);
 
   const [formData, setFormData] = useState({
     teacherId: '',
@@ -207,23 +223,49 @@ export default function TimetableManagement() {
               <div className="space-y-4 pt-4">
                 <div className="space-y-2">
                   <Label htmlFor="teacher">Teacher *</Label>
-                  <Select
-                    value={formData.teacherId}
-                    onValueChange={(value) => {
-                      setFormData(prev => ({ ...prev, teacherId: value, course: '' }));
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a teacher" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {teachers.map(teacher => (
-                        <SelectItem key={teacher.id} value={teacher.id}>
-                          {teacher.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={openAddTeacherCombo} onOpenChange={setOpenAddTeacherCombo}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={openAddTeacherCombo}
+                        className="w-full justify-between"
+                      >
+                        {formData.teacherId
+                          ? teachers.find((teacher) => teacher.id === formData.teacherId)?.name
+                          : "Select a teacher"}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search teacher..." />
+                        <CommandList>
+                          <CommandEmpty>No teacher found.</CommandEmpty>
+                          <CommandGroup>
+                            {teachers.map((teacher) => (
+                              <CommandItem
+                                key={teacher.id}
+                                value={teacher.name}
+                                onSelect={() => {
+                                  setFormData(prev => ({ ...prev, teacherId: teacher.id, course: '' }));
+                                  setOpenAddTeacherCombo(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    formData.teacherId === teacher.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {teacher.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="course">Course/Subject *</Label>
@@ -442,23 +484,49 @@ export default function TimetableManagement() {
           <div className="space-y-4 pt-4">
             <div className="space-y-2">
               <Label htmlFor="edit-teacher">Teacher *</Label>
-              <Select
-                value={formData.teacherId}
-                onValueChange={(value) => {
-                  setFormData(prev => ({ ...prev, teacherId: value, course: '' }));
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a teacher" />
-                </SelectTrigger>
-                <SelectContent>
-                  {teachers.map(teacher => (
-                    <SelectItem key={teacher.id} value={teacher.id}>
-                      {teacher.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={openEditTeacherCombo} onOpenChange={setOpenEditTeacherCombo}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={openEditTeacherCombo}
+                    className="w-full justify-between"
+                  >
+                    {formData.teacherId
+                      ? teachers.find((teacher) => teacher.id === formData.teacherId)?.name
+                      : "Select a teacher"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search teacher..." />
+                    <CommandList>
+                      <CommandEmpty>No teacher found.</CommandEmpty>
+                      <CommandGroup>
+                        {teachers.map((teacher) => (
+                          <CommandItem
+                            key={teacher.id}
+                            value={teacher.name}
+                            onSelect={() => {
+                              setFormData(prev => ({ ...prev, teacherId: teacher.id, course: '' }));
+                              setOpenEditTeacherCombo(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                formData.teacherId === teacher.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {teacher.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-course">Course/Subject *</Label>
