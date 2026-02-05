@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,7 +14,9 @@ import {
   History,
   Home,
   Menu,
-  X
+  X,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -29,6 +31,15 @@ export default function Sidebar({ userRole }: SidebarProps) {
   const { logout, user } = useAuth();
   const [showSettings, setShowSettings] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(() => {
+    // Persist sidebar state in localStorage
+    const saved = localStorage.getItem('sidebar-collapsed');
+    return saved === 'true';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('sidebar-collapsed', String(isDesktopCollapsed));
+  }, [isDesktopCollapsed]);
 
   const adminLinks = [
     { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
@@ -52,6 +63,7 @@ export default function Sidebar({ userRole }: SidebarProps) {
   };
 
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
+  const toggleDesktopSidebar = () => setIsDesktopCollapsed(prev => !prev);
 
   return (
     <>
@@ -62,6 +74,20 @@ export default function Sidebar({ userRole }: SidebarProps) {
       >
         <Menu className="w-6 h-6" />
       </button>
+
+      {/* Desktop Toggle Button - Shows when sidebar is collapsed */}
+      {isDesktopCollapsed && (
+        <motion.button
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          onClick={toggleDesktopSidebar}
+          className="hidden lg:block fixed top-4 left-4 z-50 p-2 rounded-lg bg-primary text-white shadow-lg hover:bg-primary/90 transition-colors"
+          title="Open Sidebar"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </motion.button>
+      )}
 
       {/* Mobile Overlay */}
       <AnimatePresence>
@@ -78,12 +104,16 @@ export default function Sidebar({ userRole }: SidebarProps) {
 
       {/* Sidebar */}
       <motion.aside
-        initial={{ x: -280 }}
+        initial={false}
         animate={{ 
-          x: isMobileMenuOpen ? 0 : (window.innerWidth >= 1024 ? 0 : -280)
+          x: isMobileMenuOpen 
+            ? 0 
+            : window.innerWidth >= 1024 
+              ? (isDesktopCollapsed ? -280 : 0)
+              : -280
         }}
         transition={{ duration: 0.3, ease: 'easeOut' }}
-        className="fixed left-0 top-0 h-screen w-64 bg-sidebar flex flex-col z-50 lg:translate-x-0"
+        className="fixed left-0 top-0 h-screen w-64 bg-sidebar flex flex-col z-50"
       >
         {/* Mobile Close Button */}
         <button
@@ -93,8 +123,17 @@ export default function Sidebar({ userRole }: SidebarProps) {
           <X className="w-5 h-5 text-sidebar-foreground" />
         </button>
 
+        {/* Desktop Collapse Button */}
+        <button
+          onClick={toggleDesktopSidebar}
+          className="hidden lg:block absolute top-4 right-4 p-2 rounded-lg hover:bg-sidebar-accent/50 transition-colors"
+          title="Collapse Sidebar"
+        >
+          <ChevronLeft className="w-5 h-5 text-sidebar-foreground" />
+        </button>
+
         {/* Logo */}
-        <div className="p-6 border-b border-sidebar-border">
+        <div className="p-6 border-b border-sidebar-border pt-14 lg:pt-6">
           <Link 
             to={userRole === 'super_admin' ? '/admin' : '/teacher'} 
             className="flex items-center gap-3"
