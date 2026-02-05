@@ -298,8 +298,8 @@ export default function TeacherDashboard() {
                 <ArrowUp className="w-8 h-8 sm:w-7 sm:h-7" />
               </div>
               <div className="text-left">
-                <h3 className="text-xl sm:text-xl font-heading font-bold">Pick Up Device</h3>
-                <p className={`text-base sm:text-base mt-1 ${
+                <h3 className="text-lg sm:text-base font-heading font-bold">Pick Up Device</h3>
+                <p className={`text-sm sm:text-xs mt-1 ${
                   myDevices.length > 0 ? 'text-muted-foreground' : 'text-white/80'
                 }`}>
                   {myDevices.length > 0 
@@ -329,8 +329,8 @@ export default function TeacherDashboard() {
                 <ArrowDown className="w-8 h-8 sm:w-7 sm:h-7" />
               </div>
               <div className="text-left">
-                <h3 className="text-xl sm:text-xl font-heading font-bold">Return Device</h3>
-                <p className={`text-base sm:text-base mt-1 ${myDevices.length > 0 ? 'text-white/80' : ''}`}>
+                <h3 className="text-lg sm:text-base font-heading font-bold">Return Device</h3>
+                <p className={`text-sm sm:text-xs mt-1 ${myDevices.length > 0 ? 'text-white/80' : ''}`}>
                   {myDevices.length > 0 
                     ? `${myDevices.length} device(s) with you` 
                     : 'No devices to return'}
@@ -433,8 +433,8 @@ export default function TeacherDashboard() {
                 <Calendar className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h2 className="text-lg sm:text-xl font-heading font-semibold text-foreground">{currentDay}</h2>
-                <p className="text-sm text-muted-foreground">
+                <h2 className="text-base sm:text-lg font-heading font-semibold text-foreground">{currentDay}</h2>
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   {todaySchedule.length} {todaySchedule.length === 1 ? 'class' : 'classes'} today
                 </p>
               </div>
@@ -451,16 +451,16 @@ export default function TeacherDashboard() {
                 >
                   {/* Time */}
                   <div className="flex items-center gap-2 text-foreground">
-                    <Clock className="w-5 h-5 text-primary" />
-                    <span className="text-lg font-semibold">
+                    <Clock className="w-4 h-4 text-primary" />
+                    <span className="text-sm sm:text-base font-semibold">
                       {classItem.startTime} to {classItem.endTime}
                     </span>
                   </div>
 
                   {/* Course */}
                   <div className="flex items-center gap-2">
-                    <GraduationCap className="w-5 h-5 text-primary" />
-                    <span className="text-xl font-heading font-bold text-foreground">
+                    <GraduationCap className="w-4 h-4 text-primary" />
+                    <span className="text-base sm:text-lg font-heading font-bold text-foreground">
                       {classItem.course}
                     </span>
                   </div>
@@ -511,10 +511,10 @@ export default function TeacherDashboard() {
                   <Calendar className="w-7 h-7 text-white" />
                 </motion.div>
                 <div className="flex-1">
-                  <h2 className="text-2xl font-heading font-bold text-foreground bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+                  <h2 className="text-lg sm:text-xl font-heading font-bold text-foreground bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
                     My Teaching Schedule
                   </h2>
-                  <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-1 flex items-center gap-2">
                     <span className="inline-block w-2 h-2 rounded-full bg-primary animate-pulse" />
                     Your weekly class schedule at a glance
                   </p>
@@ -547,7 +547,7 @@ export default function TeacherDashboard() {
                       }`}>
                         <div className="flex items-center justify-between">
                           <h3 className="font-bold text-foreground flex items-center gap-3">
-                            <span className={`text-xl ${isToday ? 'text-primary' : 'text-foreground/80'}`}>
+                            <span className={`text-base sm:text-lg ${isToday ? 'text-primary' : 'text-foreground/80'}`}>
                               {day}
                             </span>
                             {isToday && (
@@ -555,13 +555,13 @@ export default function TeacherDashboard() {
                                 initial={{ scale: 0.8, opacity: 0 }}
                                 animate={{ scale: 1, opacity: 1 }}
                                 transition={{ delay: 0.5 + dayIndex * 0.1 }}
-                                className="text-xs px-3 py-1.5 rounded-full bg-primary text-white font-semibold shadow-md"
+                                className="text-xs px-2.5 py-1 rounded-full bg-primary text-white font-semibold shadow-md"
                               >
                                 Today
                               </motion.span>
                             )}
                           </h3>
-                          <span className="text-xs font-medium text-muted-foreground bg-background/50 px-3 py-1 rounded-full">
+                          <span className="text-xs font-medium text-muted-foreground bg-background/50 px-2.5 py-1 rounded-full">
                             {dayClasses.length} {dayClasses.length === 1 ? 'class' : 'classes'}
                           </span>
                         </div>
@@ -628,15 +628,15 @@ export default function TeacherDashboard() {
                               
                               {/* Time */}
                               <div className="flex items-center gap-3 text-foreground pl-3">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
                                   isHappeningNow
                                     ? 'bg-primary/20 group-hover:bg-primary/30 ring-2 ring-primary/30'
                                     : 'bg-primary/10 group-hover:bg-primary/20'
                                 }`}>
-                                  <Clock className={`w-5 h-5 ${isHappeningNow ? 'text-primary' : 'text-primary/80'}`} />
+                                  <Clock className={`w-4 h-4 ${isHappeningNow ? 'text-primary' : 'text-primary/80'}`} />
                                 </div>
                                 <div>
-                                  <span className="text-base font-bold text-foreground block">
+                                  <span className="text-sm font-bold text-foreground block">
                                     {classItem.startTime} - {classItem.endTime}
                                   </span>
                                   {isHappeningNow && (
@@ -647,14 +647,14 @@ export default function TeacherDashboard() {
 
                               {/* Course */}
                               <div className="flex items-center gap-3 pl-3">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
                                   isHappeningNow
                                     ? 'bg-secondary/20 group-hover:bg-secondary/30 ring-2 ring-secondary/30'
                                     : 'bg-secondary/10 group-hover:bg-secondary/20'
                                 }`}>
-                                  <GraduationCap className="w-5 h-5 text-secondary" />
+                                  <GraduationCap className="w-4 h-4 text-secondary" />
                                 </div>
-                                <span className="text-lg font-heading font-bold text-foreground leading-tight">{classItem.course}</span>
+                                <span className="text-base font-heading font-bold text-foreground leading-tight">{classItem.course}</span>
                               </div>
 
                               {/* Classroom */}
@@ -693,8 +693,8 @@ export default function TeacherDashboard() {
         >
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-xl font-heading font-semibold text-foreground">Available at Pickup Station</h2>
-              <p className="text-sm text-muted-foreground">Click on a device to pick it up</p>
+              <h2 className="text-base sm:text-lg font-heading font-semibold text-foreground">Available at Pickup Station</h2>
+              <p className="text-xs sm:text-sm text-muted-foreground">Click on a device to pick it up</p>
             </div>
           </div>
           
