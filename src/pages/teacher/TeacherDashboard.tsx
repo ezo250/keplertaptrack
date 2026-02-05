@@ -27,6 +27,7 @@ import {
   ArrowDown,
   CheckCircle,
   AlertCircle,
+  AlertTriangle,
   Key,
   MapPin,
   GraduationCap,
@@ -74,6 +75,7 @@ export default function TeacherDashboard() {
   const availableDevices = getAvailableDevices();
   const myDevices = getUserDevices(user?.id || '');
   const mySchedule = timetable.filter(t => t.teacherId === user?.id);
+  const hasOverdueDevice = myDevices.some(d => d.status === 'overdue');
 
   // Filter available devices based on search query
   const filteredAvailableDevices = availableDevices.filter(d =>
@@ -343,24 +345,47 @@ export default function TeacherDashboard() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex items-start gap-4"
+            className={`${
+              hasOverdueDevice 
+                ? 'bg-destructive/10 border-destructive/30' 
+                : 'bg-primary/5 border-primary/20'
+            } border rounded-xl p-4 flex items-start gap-4`}
           >
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <AlertCircle className="w-5 h-5 text-primary" />
+            <div className={`w-10 h-10 rounded-full ${
+              hasOverdueDevice 
+                ? 'bg-destructive/20 animate-pulse' 
+                : 'bg-primary/10'
+            } flex items-center justify-center flex-shrink-0`}>
+              <AlertCircle className={`w-5 h-5 ${
+                hasOverdueDevice ? 'text-destructive' : 'text-primary'
+              }`} />
             </div>
             <div>
-              <h4 className="font-medium text-foreground">You have {myDevices.length} device(s)</h4>
+              <h4 className={`font-semibold ${
+                hasOverdueDevice ? 'text-destructive' : 'text-foreground'
+              }`}>
+                {hasOverdueDevice ? '⚠️ Device Overdue!' : `You have ${myDevices.length} device(s)`}
+              </h4>
               <p className="text-sm text-muted-foreground mt-1">
-                Remember to return them after your class so other teachers can use them.
+                {hasOverdueDevice 
+                  ? 'Your class has ended. Please return the device immediately to avoid penalties.' 
+                  : 'Remember to return them after your class so other teachers can use them.'}
               </p>
               <div className="flex flex-wrap gap-2 mt-3">
                 {myDevices.map(device => (
                   <span 
                     key={device.id} 
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium"
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${
+                      device.status === 'overdue'
+                        ? 'bg-destructive/20 text-destructive border border-destructive/30 animate-pulse'
+                        : 'bg-primary/10 text-primary'
+                    }`}
                   >
                     <Tablet className="w-4 h-4" />
                     {device.deviceId}
+                    {device.status === 'overdue' && (
+                      <span className="ml-1 text-xs font-bold">OVERDUE</span>
+                    )}
                   </span>
                 ))}
               </div>
@@ -388,9 +413,9 @@ export default function TeacherDashboard() {
           <StatCard
             title="Devices With Me"
             value={myDevices.length}
-            subtitle={myDevices.length > 0 ? 'Remember to return' : 'All clear!'}
-            icon={myDevices.length > 0 ? Clock : CheckCircle}
-            variant={myDevices.length > 0 ? 'warning' : 'default'}
+            subtitle={hasOverdueDevice ? '⚠️ Overdue - Return now!' : myDevices.length > 0 ? 'Remember to return' : 'All clear!'}
+            icon={hasOverdueDevice ? AlertTriangle : myDevices.length > 0 ? Clock : CheckCircle}
+            variant={hasOverdueDevice ? 'destructive' : myDevices.length > 0 ? 'warning' : 'default'}
             delay={0.3}
           />
         </div>
@@ -471,67 +496,80 @@ export default function TeacherDashboard() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.35 }}
-            className="bg-card rounded-xl border border-border/50 p-6"
+            className="bg-gradient-to-br from-card via-card to-primary/5 rounded-2xl border border-border/50 p-6 shadow-lg"
           >
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-primary" />
+            <div className="flex items-center gap-4 mb-6 pb-4 border-b border-border/30">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-md">
+                <Calendar className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2 className="text-xl font-heading font-semibold text-foreground">My Teaching Schedule</h2>
-                <p className="text-sm text-muted-foreground">Your weekly class schedule</p>
+                <h2 className="text-2xl font-heading font-bold text-foreground">My Teaching Schedule</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">Your weekly class schedule</p>
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map(day => {
                 const dayClasses = mySchedule.filter(t => t.day === day);
                 if (dayClasses.length === 0) return null;
 
                 return (
-                  <div key={day} className="rounded-lg border border-border/50 overflow-hidden">
-                    <div className="bg-muted/30 px-4 py-2 border-b border-border/50">
-                      <h3 className="font-medium text-foreground flex items-center gap-2">
-                        <span className={day === currentDay ? 'text-primary' : ''}>
+                  <div key={day} className="rounded-xl border border-border/50 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                    <div className={`px-5 py-3 border-b border-border/50 ${
+                      day === currentDay 
+                        ? 'bg-gradient-to-r from-primary/20 to-primary/10' 
+                        : 'bg-gradient-to-r from-muted/50 to-muted/30'
+                    }`}>
+                      <h3 className="font-semibold text-foreground flex items-center gap-3">
+                        <span className={`text-lg ${day === currentDay ? 'text-primary' : ''}`}>
                           {day}
                         </span>
                         {day === currentDay && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                          <span className="text-xs px-3 py-1 rounded-full bg-primary text-white font-medium shadow-sm">
                             Today
                           </span>
                         )}
                       </h3>
                     </div>
-                    <div className="p-4 space-y-3">
+                    <div className="p-4 bg-gradient-to-br from-card to-muted/10 space-y-3">
                       {dayClasses.sort((a, b) => a.startTime.localeCompare(b.startTime)).map((classItem, index) => (
                         <motion.div
                           key={classItem.id}
                           initial={{ opacity: 0, x: -10 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: 0.4 + index * 0.05 }}
-                          className="p-4 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors space-y-2"
+                          className="relative p-4 rounded-lg bg-card border border-border/30 hover:border-primary/30 hover:shadow-md transition-all duration-300 space-y-3 group"
                         >
+                          {/* Decorative accent */}
+                          <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-primary to-primary/50 rounded-l-lg" />
+                          
                           {/* Time */}
-                          <div className="flex items-center gap-2 text-foreground">
-                            <Clock className="w-4 h-4 text-primary" />
-                            <span className="font-semibold">
+                          <div className="flex items-center gap-2 text-foreground pl-3">
+                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                              <Clock className="w-4 h-4 text-primary" />
+                            </div>
+                            <span className="text-base font-semibold">
                               {classItem.startTime} to {classItem.endTime}
                             </span>
                           </div>
 
                           {/* Course */}
-                          <div className="flex items-center gap-2">
-                            <GraduationCap className="w-4 h-4 text-primary" />
-                            <span className="font-bold text-foreground">{classItem.course}</span>
+                          <div className="flex items-center gap-2 pl-3">
+                            <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center group-hover:bg-secondary/20 transition-colors">
+                              <GraduationCap className="w-4 h-4 text-secondary" />
+                            </div>
+                            <span className="text-lg font-heading font-bold text-foreground">{classItem.course}</span>
                           </div>
 
                           {/* Classroom */}
                           {classItem.classroom && (
-                            <div className="flex items-center gap-2 bg-primary/10 rounded-md px-2.5 py-1.5 w-fit">
-                              <MapPin className="w-4 h-4 text-primary" />
-                              <span className="font-medium text-primary text-sm">
-                                {classItem.classroom}
-                              </span>
+                            <div className="flex items-center gap-2 pl-3">
+                              <div className="flex items-center gap-2 bg-gradient-to-r from-primary/15 to-primary/10 rounded-lg px-3 py-2 w-fit shadow-sm">
+                                <MapPin className="w-4 h-4 text-primary" />
+                                <span className="font-semibold text-primary text-sm">
+                                  {classItem.classroom}
+                                </span>
+                              </div>
                             </div>
                           )}
                         </motion.div>

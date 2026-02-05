@@ -3,27 +3,88 @@ import { prisma } from '../index';
 
 const router = express.Router();
 
-// Helper function to check and update overdue devices
+// Helper function to check if two time slots are consecutive
+function areConsecutive(endTime1: string, startTime2: string): boolean {
+  // Convert time strings to minutes (e.g., "10:00" -> 600)
+  const timeToMinutes = (time: string) => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+  
+  const end1 = timeToMinutes(endTime1);
+  const start2 = timeToMinutes(startTime2);
+  
+  // Sessions are consecutive if they're within 5 minutes of each other
+  return Math.abs(start2 - end1) <= 5;
+}
+
+// Helper function to check and update overdue devices based on timetable
 async function checkAndUpdateOverdueDevices() {
   const now = new Date();
-  const OVERDUE_THRESHOLD_MS = (10 * 60 + 30) * 60 * 1000; // 10 hours 30 minutes in milliseconds
-
+  const OVERDUE_BUFFER_MS = 5 * 60 * 1000; // 5 minutes in milliseconds
+  
+  // Get current day of week
+  const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const currentDay = daysOfWeek[now.getDay()];
+  
+  // Get current time in HH:MM format
+  const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+  
   // Find all devices that are in_use
   const devicesInUse = await prisma.device.findMany({
     where: { status: 'in_use' },
   });
 
-  // Check each device and update if overdue
+  // Check each device
   for (const device of devicesInUse) {
-    if (device.pickedUpAt) {
+    if (!device.currentUserId || !device.pickedUpAt) continue;
+    
+    // Get teacher's timetable for today
+    const todaySchedule = await prisma.timetableEntry.findMany({
+      where: {
+        teacherId: device.currentUserId,
+        day: currentDay,
+      },
+      orderBy: {
+        startTime: 'asc',
+      },
+    });
+    
+    if (todaySchedule.length === 0) {
+      // No schedule today, use simple time-based check (10.5 hours)
       const timeSincePickup = now.getTime() - new Date(device.pickedUpAt).getTime();
+      const FALLBACK_THRESHOLD_MS = (10 * 60 + 30) * 60 * 1000;
       
-      if (timeSincePickup > OVERDUE_THRESHOLD_MS && device.status !== 'overdue') {
+      if (timeSincePickup > FALLBACK_THRESHOLD_MS && device.status !== 'overdue') {
         await prisma.device.update({
           where: { id: device.id },
           data: { status: 'overdue' },
         });
       }
+      continue;
+    }
+    
+    // Find the last non-consecutive session end time
+    let lastSessionEndTime = todaySchedule[todaySchedule.length - 1].endTime;
+    
+    // Check if current time is past the last session + buffer
+    const timeToMinutes = (time: string) => {
+      const [hours, minutes] = time.split(':').map(Number);
+      return hours * 60 + minutes;
+    };
+    
+    const currentMinutes = timeToMinutes(currentTime);
+    const lastSessionEndMinutes = timeToMinutes(lastSessionEndTime);
+    const timeSinceLastSession = currentMinutes - lastSessionEndMinutes;
+    
+    // Only mark as overdue if:
+    // 1. Current time is past the last session end time
+    // 2. More than 5 minutes have passed since the last session ended
+    if (timeSinceLastSession > 5 && device.status !== 'overdue') {
+      await prisma.device.update({
+        where: { id: device.id },
+        data: { status: 'overdue' },
+      });
     }
   }
 }
@@ -100,7 +161,34 @@ router.post('/:id/pickup', async (req, res) => {
     const { userId, userName } = req.body;
 
     const now = new Date();
-    const expectedReturn = new Date(now.getTime() + (10 * 60 + 30) * 60 * 1000); // 10 hours 30 minutes
+    
+    // Get teacher's schedule for today to calculate expected return
+    const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const currentDay = daysOfWeek[now.getDay()];
+    
+    const todaySchedule = await prisma.timetableEntry.findMany({
+      where: {
+        teacherId: userId,
+        day: currentDay,
+      },
+      orderBy: {
+        endTime: 'desc',
+      },
+    });
+    
+    let expectedReturn: Date;
+    
+    if (todaySchedule.length > 0) {
+      // Use the last class end time + 5 minutes as expected return
+      const lastClassEndTime = todaySchedule[0].endTime;
+      const [hours, minutes] = lastClassEndTime.split(':').map(Number);
+      
+      expectedReturn = new Date(now);
+      expectedReturn.setHours(hours, minutes + 5, 0, 0);
+    } else {
+      // Fallback to 10.5 hours if no schedule
+      expectedReturn = new Date(now.getTime() + (10 * 60 + 30) * 60 * 1000);
+    }
 
     const device = await prisma.device.update({
       where: { id },

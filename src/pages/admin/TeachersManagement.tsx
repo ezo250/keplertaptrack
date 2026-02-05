@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/table';
 import { Plus, Search, Edit2, Trash2, Mail, GraduationCap, Key, Eye } from 'lucide-react';
 import { toast } from 'sonner';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { teachersAPI } from '@/services/api';
 
 export default function TeachersManagement() {
@@ -256,19 +257,20 @@ export default function TeachersManagement() {
           transition={{ delay: 0.2 }}
           className="bg-card rounded-xl border border-border/50 overflow-hidden"
         >
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Teacher</TableHead>
-                <TableHead>Department</TableHead>
-                <TableHead>Courses</TableHead>
-                <TableHead className="text-right w-[180px]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <AnimatePresence>
-                {filteredTeachers.map((teacher, index) => (
-                  <motion.tr
+          <ScrollArea className="h-[600px]">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Teacher</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Courses</TableHead>
+                  <TableHead className="text-right w-[180px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <AnimatePresence>
+                  {filteredTeachers.map((teacher, index) => (
+                    <motion.tr
                     key={teacher.id}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -342,17 +344,18 @@ export default function TeachersManagement() {
                         </Button>
                       </div>
                     </TableCell>
-                  </motion.tr>
-                ))}
-              </AnimatePresence>
-            </TableBody>
-          </Table>
-          
-          {filteredTeachers.length === 0 && (
-            <div className="p-12 text-center">
-              <p className="text-muted-foreground">No teachers found</p>
-            </div>
-          )}
+                    </motion.tr>
+                  ))}
+                </AnimatePresence>
+              </TableBody>
+            </Table>
+            
+            {filteredTeachers.length === 0 && (
+              <div className="p-12 text-center">
+                <p className="text-muted-foreground">No teachers found</p>
+              </div>
+            )}
+          </ScrollArea>
         </motion.div>
       </div>
 
