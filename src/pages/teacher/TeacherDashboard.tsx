@@ -490,94 +490,196 @@ export default function TeacherDashboard() {
           </motion.div>
         )}
 
-        {/* My Schedule */}
+        {/* My Schedule - Enhanced Design */}
         {mySchedule.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.35 }}
-            className="bg-gradient-to-br from-card via-card to-primary/5 rounded-2xl border border-border/50 p-6 shadow-lg"
+            className="relative overflow-hidden bg-gradient-to-br from-card via-card/95 to-primary/5 rounded-2xl border border-border/50 p-6 shadow-xl"
           >
-            <div className="flex items-center gap-4 mb-6 pb-4 border-b border-border/30">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-md">
-                <Calendar className="w-6 h-6 text-white" />
+            {/* Decorative background elements */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-primary/5 to-transparent rounded-full blur-3xl -z-0" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-secondary/5 to-transparent rounded-full blur-3xl -z-0" />
+            
+            <div className="relative z-10">
+              <div className="flex items-center gap-4 mb-6 pb-5 border-b border-border/30">
+                <motion.div 
+                  whileHover={{ rotate: 5, scale: 1.05 }}
+                  className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary via-primary to-primary/80 flex items-center justify-center shadow-lg"
+                >
+                  <Calendar className="w-7 h-7 text-white" />
+                </motion.div>
+                <div className="flex-1">
+                  <h2 className="text-2xl font-heading font-bold text-foreground bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+                    My Teaching Schedule
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                    <span className="inline-block w-2 h-2 rounded-full bg-primary animate-pulse" />
+                    Your weekly class schedule at a glance
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-2xl font-heading font-bold text-foreground">My Teaching Schedule</h2>
-                <p className="text-sm text-muted-foreground mt-0.5">Your weekly class schedule</p>
-              </div>
-            </div>
 
-            <div className="space-y-4">
-              {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map(day => {
-                const dayClasses = mySchedule.filter(t => t.day === day);
-                if (dayClasses.length === 0) return null;
+              <div className="space-y-5">
+                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((day, dayIndex) => {
+                  const dayClasses = mySchedule.filter(t => t.day === day);
+                  if (dayClasses.length === 0) return null;
 
-                return (
-                  <div key={day} className="rounded-xl border border-border/50 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                    <div className={`px-5 py-3 border-b border-border/50 ${
-                      day === currentDay 
-                        ? 'bg-gradient-to-r from-primary/20 to-primary/10' 
-                        : 'bg-gradient-to-r from-muted/50 to-muted/30'
-                    }`}>
-                      <h3 className="font-semibold text-foreground flex items-center gap-3">
-                        <span className={`text-lg ${day === currentDay ? 'text-primary' : ''}`}>
-                          {day}
-                        </span>
-                        {day === currentDay && (
-                          <span className="text-xs px-3 py-1 rounded-full bg-primary text-white font-medium shadow-sm">
-                            Today
-                          </span>
-                        )}
-                      </h3>
-                    </div>
-                    <div className="p-4 bg-gradient-to-br from-card to-muted/10 space-y-3">
-                      {dayClasses.sort((a, b) => a.startTime.localeCompare(b.startTime)).map((classItem, index) => (
-                        <motion.div
-                          key={classItem.id}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.4 + index * 0.05 }}
-                          className="relative p-4 rounded-lg bg-card border border-border/30 hover:border-primary/30 hover:shadow-md transition-all duration-300 space-y-3 group"
-                        >
-                          {/* Decorative accent */}
-                          <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-primary to-primary/50 rounded-l-lg" />
-                          
-                          {/* Time */}
-                          <div className="flex items-center gap-2 text-foreground pl-3">
-                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                              <Clock className="w-4 h-4 text-primary" />
-                            </div>
-                            <span className="text-base font-semibold">
-                              {classItem.startTime} to {classItem.endTime}
+                  const isToday = day === currentDay;
+
+                  return (
+                    <motion.div 
+                      key={day} 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.4 + dayIndex * 0.1 }}
+                      className={`rounded-2xl border overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 ${
+                        isToday 
+                          ? 'border-primary/40 ring-2 ring-primary/20' 
+                          : 'border-border/40 hover:border-primary/20'
+                      }`}
+                    >
+                      <div className={`px-6 py-4 border-b ${
+                        isToday 
+                          ? 'bg-gradient-to-r from-primary/20 via-primary/15 to-primary/10 border-primary/20' 
+                          : 'bg-gradient-to-r from-muted/60 via-muted/40 to-muted/20 border-border/30'
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-bold text-foreground flex items-center gap-3">
+                            <span className={`text-xl ${isToday ? 'text-primary' : 'text-foreground/80'}`}>
+                              {day}
                             </span>
-                          </div>
-
-                          {/* Course */}
-                          <div className="flex items-center gap-2 pl-3">
-                            <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center group-hover:bg-secondary/20 transition-colors">
-                              <GraduationCap className="w-4 h-4 text-secondary" />
-                            </div>
-                            <span className="text-lg font-heading font-bold text-foreground">{classItem.course}</span>
-                          </div>
-
-                          {/* Classroom */}
-                          {classItem.classroom && (
-                            <div className="flex items-center gap-2 pl-3">
-                              <div className="flex items-center gap-2 bg-gradient-to-r from-primary/15 to-primary/10 rounded-lg px-3 py-2 w-fit shadow-sm">
-                                <MapPin className="w-4 h-4 text-primary" />
-                                <span className="font-semibold text-primary text-sm">
-                                  {classItem.classroom}
-                                </span>
+                            {isToday && (
+                              <motion.span 
+                                initial={{ scale: 0.8, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                transition={{ delay: 0.5 + dayIndex * 0.1 }}
+                                className="text-xs px-3 py-1.5 rounded-full bg-primary text-white font-semibold shadow-md"
+                              >
+                                Today
+                              </motion.span>
+                            )}
+                          </h3>
+                          <span className="text-xs font-medium text-muted-foreground bg-background/50 px-3 py-1 rounded-full">
+                            {dayClasses.length} {dayClasses.length === 1 ? 'class' : 'classes'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="p-5 bg-gradient-to-br from-card via-card/98 to-muted/5 space-y-4">
+                        {dayClasses.sort((a, b) => a.startTime.localeCompare(b.startTime)).map((classItem, index) => {
+                          // Check if class is happening now
+                          const now = new Date();
+                          const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+                          const isHappeningNow = isToday && currentTime >= classItem.startTime && currentTime <= classItem.endTime;
+                          const isUpcoming = isToday && currentTime < classItem.startTime;
+                          const isPast = isToday && currentTime > classItem.endTime;
+                          
+                          return (
+                            <motion.div
+                              key={classItem.id}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: 0.5 + dayIndex * 0.1 + index * 0.05 }}
+                              className={`relative p-5 rounded-xl border transition-all duration-300 space-y-4 group ${
+                                isHappeningNow
+                                  ? 'bg-gradient-to-br from-primary/10 via-primary/5 to-card border-primary/40 shadow-lg ring-2 ring-primary/20'
+                                  : isUpcoming
+                                  ? 'bg-card border-border/40 hover:border-primary/30 hover:shadow-lg'
+                                  : isPast
+                                  ? 'bg-muted/30 border-border/20 opacity-70'
+                                  : 'bg-card border-border/40 hover:border-primary/30 hover:shadow-lg'
+                              }`}
+                            >
+                              {/* Decorative accent bar */}
+                              <div className={`absolute top-0 left-0 w-1.5 h-full rounded-l-xl ${
+                                isHappeningNow
+                                  ? 'bg-gradient-to-b from-primary via-primary to-primary/70 animate-pulse'
+                                  : isUpcoming
+                                  ? 'bg-gradient-to-b from-secondary via-secondary to-secondary/70'
+                                  : 'bg-gradient-to-b from-primary/30 to-primary/10'
+                              }`} />
+                              
+                              {/* Status badge */}
+                              {isToday && (
+                                <div className="absolute top-3 right-3">
+                                  {isHappeningNow ? (
+                                    <motion.span 
+                                      animate={{ scale: [1, 1.05, 1] }}
+                                      transition={{ repeat: Infinity, duration: 2 }}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary text-white text-xs font-bold shadow-md"
+                                    >
+                                      <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                                      In Progress
+                                    </motion.span>
+                                  ) : isUpcoming ? (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary/20 text-secondary text-xs font-semibold border border-secondary/30">
+                                      <Clock className="w-3 h-3" />
+                                      Upcoming
+                                    </span>
+                                  ) : isPast ? (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted text-muted-foreground text-xs font-medium">
+                                      <CheckCircle className="w-3 h-3" />
+                                      Completed
+                                    </span>
+                                  ) : null}
+                                </div>
+                              )}
+                              
+                              {/* Time */}
+                              <div className="flex items-center gap-3 text-foreground pl-3">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+                                  isHappeningNow
+                                    ? 'bg-primary/20 group-hover:bg-primary/30 ring-2 ring-primary/30'
+                                    : 'bg-primary/10 group-hover:bg-primary/20'
+                                }`}>
+                                  <Clock className={`w-5 h-5 ${isHappeningNow ? 'text-primary' : 'text-primary/80'}`} />
+                                </div>
+                                <div>
+                                  <span className="text-base font-bold text-foreground block">
+                                    {classItem.startTime} - {classItem.endTime}
+                                  </span>
+                                  {isHappeningNow && (
+                                    <span className="text-xs text-primary font-medium">Currently in session</span>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          )}
-                        </motion.div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
+
+                              {/* Course */}
+                              <div className="flex items-center gap-3 pl-3">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+                                  isHappeningNow
+                                    ? 'bg-secondary/20 group-hover:bg-secondary/30 ring-2 ring-secondary/30'
+                                    : 'bg-secondary/10 group-hover:bg-secondary/20'
+                                }`}>
+                                  <GraduationCap className="w-5 h-5 text-secondary" />
+                                </div>
+                                <span className="text-lg font-heading font-bold text-foreground leading-tight">{classItem.course}</span>
+                              </div>
+
+                              {/* Classroom */}
+                              {classItem.classroom && (
+                                <div className="flex items-center gap-2 pl-3">
+                                  <div className={`flex items-center gap-2.5 rounded-xl px-4 py-2.5 w-fit shadow-sm transition-all ${
+                                    isHappeningNow
+                                      ? 'bg-gradient-to-r from-primary/20 to-primary/15 ring-2 ring-primary/20'
+                                      : 'bg-gradient-to-r from-primary/15 to-primary/10 group-hover:from-primary/20 group-hover:to-primary/15'
+                                  }`}>
+                                    <MapPin className="w-4 h-4 text-primary" />
+                                    <span className="font-bold text-primary text-sm">
+                                      {classItem.classroom}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                            </motion.div>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
             </div>
           </motion.div>
         )}

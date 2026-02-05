@@ -21,19 +21,25 @@ function areConsecutive(endTime1: string, startTime2: string): boolean {
 // Helper function to check and update overdue devices based on timetable
 async function checkAndUpdateOverdueDevices() {
   const now = new Date();
-  const OVERDUE_BUFFER_MS = 5 * 60 * 1000; // 5 minutes in milliseconds
+  const OVERDUE_BUFFER_MINUTES = 5; // 5 minutes buffer after session ends
   
   // Get current day of week
   const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const currentDay = daysOfWeek[now.getDay()];
   
-  // Get current time in HH:MM format
-  const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+  // Get current time in minutes since midnight
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
   
   // Find all devices that are in_use
   const devicesInUse = await prisma.device.findMany({
     where: { status: 'in_use' },
   });
+
+  // Helper function to convert time string to minutes
+  const timeToMinutes = (time: string) => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
 
   // Check each device
   for (const device of devicesInUse) {
@@ -64,23 +70,24 @@ async function checkAndUpdateOverdueDevices() {
       continue;
     }
     
-    // Find the last non-consecutive session end time
-    let lastSessionEndTime = todaySchedule[todaySchedule.length - 1].endTime;
+    // NEW LOGIC: Check EACH session independently
+    // For every session that has ended, check if 5 minutes have passed
+    // If yes, and device not returned, flag as overdue
+    let shouldBeOverdue = false;
     
-    // Check if current time is past the last session + buffer
-    const timeToMinutes = (time: string) => {
-      const [hours, minutes] = time.split(':').map(Number);
-      return hours * 60 + minutes;
-    };
+    for (const session of todaySchedule) {
+      const sessionEndMinutes = timeToMinutes(session.endTime);
+      const minutesSinceSessionEnd = currentMinutes - sessionEndMinutes;
+      
+      // If ANY session has ended and more than 5 minutes have passed
+      if (minutesSinceSessionEnd > OVERDUE_BUFFER_MINUTES) {
+        shouldBeOverdue = true;
+        break; // No need to check further, already overdue
+      }
+    }
     
-    const currentMinutes = timeToMinutes(currentTime);
-    const lastSessionEndMinutes = timeToMinutes(lastSessionEndTime);
-    const timeSinceLastSession = currentMinutes - lastSessionEndMinutes;
-    
-    // Only mark as overdue if:
-    // 1. Current time is past the last session end time
-    // 2. More than 5 minutes have passed since the last session ended
-    if (timeSinceLastSession > 5 && device.status !== 'overdue') {
+    // Update device status if it should be overdue
+    if (shouldBeOverdue && device.status !== 'overdue') {
       await prisma.device.update({
         where: { id: device.id },
         data: { status: 'overdue' },
