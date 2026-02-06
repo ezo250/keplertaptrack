@@ -151,7 +151,7 @@ export default function TeacherDashboard() {
         setLastActionDevice(deviceId);
         setIsVerifyingQR(false);
         setShowReturnSuccess(true);
-      };
+      }
     };
 
     try {
