@@ -239,36 +239,34 @@ export default function AdminDashboard() {
                     {recentActivity.length === 0 ? (
                       <p className="text-center text-muted-foreground py-8">No recent activity</p>
                     ) : (
-                      deviceHistory
-                        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-                        .map((activity, index) => (
-                          <motion.div
-                            key={activity.id}
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.7 + (index < 10 ? index * 0.1 : 0) }}
-                            className="flex items-start gap-3 pb-4 border-b border-border/50 last:border-0 last:pb-0"
-                          >
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                              activity.action === 'pickup' 
-                                ? 'bg-primary/10 text-primary' 
-                                : 'bg-success/10 text-success'
-                            }`}>
-                              {activity.action === 'pickup' ? '↑' : '↓'}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-foreground truncate">
-                                {activity.userName}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {activity.action === 'pickup' ? 'Picked up' : 'Returned'}{' '}
-                                <span className="font-medium">
-                                  {devices.find(d => d.id === activity.deviceId)?.deviceId || activity.deviceId}
-                                </span>
-                              </p>
-                            </div>
-                          </motion.div>
-                        ))
+                      recentActivity.map((activity, index) => (
+                        <motion.div
+                          key={`${activity.id}-${activity.timestamp}`}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.7 + index * 0.1 }}
+                          className="flex items-start gap-3 pb-4 border-b border-border/50 last:border-0 last:pb-0"
+                        >
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                            activity.action === 'pickup' 
+                              ? 'bg-primary/10 text-primary' 
+                              : 'bg-success/10 text-success'
+                          }`}>
+                            {activity.action === 'pickup' ? '↑' : '↓'}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">
+                              {activity.userName}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {activity.action === 'pickup' ? 'Picked up' : 'Returned'}{' '}
+                              <span className="font-medium">
+                                {devices.find(d => d.id === activity.deviceId)?.deviceId || activity.deviceId}
+                              </span>
+                            </p>
+                          </div>
+                        </motion.div>
+                      ))
                     )}
                   </div>
                 </ScrollArea>
