@@ -29,11 +29,16 @@ async function checkAndUpdateOverdueDevices() {
   
   // Get current time in minutes since midnight
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const currentTimeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+  
+  console.log(`\n[OVERDUE CHECK] Running at ${currentTimeStr} on ${currentDay}`);
   
   // Find all devices that are in_use
   const devicesInUse = await prisma.device.findMany({
     where: { status: 'in_use' },
   });
+
+  console.log(`[OVERDUE CHECK] Found ${devicesInUse.length} devices in use`);
 
   // Helper function to convert time string to minutes
   const timeToMinutes = (time: string) => {
@@ -43,7 +48,12 @@ async function checkAndUpdateOverdueDevices() {
 
   // Check each device
   for (const device of devicesInUse) {
-    if (!device.currentUserId || !device.pickedUpAt) continue;
+    if (!device.currentUserId || !device.pickedUpAt) {
+      console.log(`[OVERDUE CHECK] Skipping device ${device.deviceId} - missing userId or pickedUpAt`);
+      continue;
+    }
+    
+    console.log(`\n[OVERDUE CHECK] Checking device ${device.deviceId} (User: ${device.currentUserName})`);
     
     // Get teacher's timetable for today
     const todaySchedule = await prisma.timetableEntry.findMany({
@@ -56,19 +66,32 @@ async function checkAndUpdateOverdueDevices() {
       },
     });
     
+    console.log(`[OVERDUE CHECK] Teacher has ${todaySchedule.length} sessions today (${currentDay})`);
+    
     if (todaySchedule.length === 0) {
       // No schedule today, use simple time-based check (10.5 hours)
       const timeSincePickup = now.getTime() - new Date(device.pickedUpAt).getTime();
       const FALLBACK_THRESHOLD_MS = (10 * 60 + 30) * 60 * 1000;
+      const hoursSincePickup = (timeSincePickup / (60 * 60 * 1000)).toFixed(2);
+      
+      console.log(`[OVERDUE CHECK] No schedule - using fallback (10.5 hours). Time since pickup: ${hoursSincePickup} hours`);
       
       if (timeSincePickup > FALLBACK_THRESHOLD_MS && device.status !== 'overdue') {
+        console.log(`[OVERDUE CHECK] ✓ FLAGGING AS OVERDUE (fallback threshold exceeded)`);
         await prisma.device.update({
           where: { id: device.id },
           data: { status: 'overdue' },
         });
+      } else {
+        console.log(`[OVERDUE CHECK] Not overdue yet (fallback)`);
       }
       continue;
     }
+    
+    // Log all sessions for debugging
+    todaySchedule.forEach((session, idx) => {
+      console.log(`[OVERDUE CHECK]   Session ${idx + 1}: ${session.startTime} - ${session.endTime} (${session.course})`);
+    });
     
     // FIXED LOGIC: Only flag as overdue after the LAST session ends
     // Find the last session's end time
@@ -76,17 +99,32 @@ async function checkAndUpdateOverdueDevices() {
     const lastSessionEndMinutes = timeToMinutes(lastSession.endTime);
     const minutesSinceLastSessionEnd = currentMinutes - lastSessionEndMinutes;
     
+    console.log(`[OVERDUE CHECK] Last session ends at: ${lastSession.endTime}`);
+    console.log(`[OVERDUE CHECK] Current time: ${currentTimeStr} (${currentMinutes} mins since midnight)`);
+    console.log(`[OVERDUE CHECK] Last session end: ${lastSession.endTime} (${lastSessionEndMinutes} mins since midnight)`);
+    console.log(`[OVERDUE CHECK] Minutes since last session ended: ${minutesSinceLastSessionEnd}`);
+    console.log(`[OVERDUE CHECK] Buffer required: ${OVERDUE_BUFFER_MINUTES} minutes`);
+    
     // Device is overdue only if the LAST session has ended and buffer time has passed
     const shouldBeOverdue = minutesSinceLastSessionEnd > OVERDUE_BUFFER_MINUTES;
     
+    console.log(`[OVERDUE CHECK] Should be overdue? ${shouldBeOverdue}`);
+    
     // Update device status if it should be overdue
     if (shouldBeOverdue && device.status !== 'overdue') {
+      console.log(`[OVERDUE CHECK] ✓ FLAGGING AS OVERDUE`);
       await prisma.device.update({
         where: { id: device.id },
         data: { status: 'overdue' },
       });
+    } else if (shouldBeOverdue) {
+      console.log(`[OVERDUE CHECK] Already marked as overdue`);
+    } else {
+      console.log(`[OVERDUE CHECK] Not overdue yet - still within buffer time or session ongoing`);
     }
   }
+  
+  console.log(`[OVERDUE CHECK] Check complete\n`);
 }
 
 // Get all devices
