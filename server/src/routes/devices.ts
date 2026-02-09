@@ -93,34 +93,63 @@ async function checkAndUpdateOverdueDevices() {
       console.log(`[OVERDUE CHECK]   Session ${idx + 1}: ${session.startTime} - ${session.endTime} (${session.course})`);
     });
     
-    // FIXED LOGIC: Only flag as overdue after the LAST session ends
-    // Find the last session's end time
-    const lastSession = todaySchedule[todaySchedule.length - 1]; // Already sorted by startTime
-    const lastSessionEndMinutes = timeToMinutes(lastSession.endTime);
-    const minutesSinceLastSessionEnd = currentMinutes - lastSessionEndMinutes;
+    // NEW LOGIC: Flag as overdue if ANY session has ended + buffer, and no current session is ongoing
+    // Step 1: Check if there's a session happening RIGHT NOW
+    let currentSession = null;
+    for (const session of todaySchedule) {
+      const sessionStartMinutes = timeToMinutes(session.startTime);
+      const sessionEndMinutes = timeToMinutes(session.endTime);
+      
+      if (currentMinutes >= sessionStartMinutes && currentMinutes <= sessionEndMinutes) {
+        currentSession = session;
+        break;
+      }
+    }
     
-    console.log(`[OVERDUE CHECK] Last session ends at: ${lastSession.endTime}`);
     console.log(`[OVERDUE CHECK] Current time: ${currentTimeStr} (${currentMinutes} mins since midnight)`);
-    console.log(`[OVERDUE CHECK] Last session end: ${lastSession.endTime} (${lastSessionEndMinutes} mins since midnight)`);
-    console.log(`[OVERDUE CHECK] Minutes since last session ended: ${minutesSinceLastSessionEnd}`);
-    console.log(`[OVERDUE CHECK] Buffer required: ${OVERDUE_BUFFER_MINUTES} minutes`);
     
-    // Device is overdue only if the LAST session has ended and buffer time has passed
-    const shouldBeOverdue = minutesSinceLastSessionEnd > OVERDUE_BUFFER_MINUTES;
-    
-    console.log(`[OVERDUE CHECK] Should be overdue? ${shouldBeOverdue}`);
-    
-    // Update device status if it should be overdue
-    if (shouldBeOverdue && device.status !== 'overdue') {
-      console.log(`[OVERDUE CHECK] ✓ FLAGGING AS OVERDUE`);
-      await prisma.device.update({
-        where: { id: device.id },
-        data: { status: 'overdue' },
-      });
-    } else if (shouldBeOverdue) {
-      console.log(`[OVERDUE CHECK] Already marked as overdue`);
+    if (currentSession) {
+      // Teacher is currently in a session - NOT overdue
+      console.log(`[OVERDUE CHECK] Teacher is IN SESSION: ${currentSession.startTime} - ${currentSession.endTime}`);
+      console.log(`[OVERDUE CHECK] Not overdue - session ongoing`);
     } else {
-      console.log(`[OVERDUE CHECK] Not overdue yet - still within buffer time or session ongoing`);
+      // No current session - check if any past session has ended
+      console.log(`[OVERDUE CHECK] No session currently ongoing`);
+      
+      // Find all sessions that have already ended
+      const endedSessions = todaySchedule.filter(session => {
+        const sessionEndMinutes = timeToMinutes(session.endTime);
+        return currentMinutes > sessionEndMinutes;
+      });
+      
+      if (endedSessions.length > 0) {
+        // Get the most recent ended session
+        const lastEndedSession = endedSessions[endedSessions.length - 1];
+        const lastEndedSessionEndMinutes = timeToMinutes(lastEndedSession.endTime);
+        const minutesSinceEnded = currentMinutes - lastEndedSessionEndMinutes;
+        
+        console.log(`[OVERDUE CHECK] Last ended session: ${lastEndedSession.startTime} - ${lastEndedSession.endTime}`);
+        console.log(`[OVERDUE CHECK] Minutes since session ended: ${minutesSinceEnded}`);
+        console.log(`[OVERDUE CHECK] Buffer required: ${OVERDUE_BUFFER_MINUTES} minutes`);
+        
+        const shouldBeOverdue = minutesSinceEnded > OVERDUE_BUFFER_MINUTES;
+        console.log(`[OVERDUE CHECK] Should be overdue? ${shouldBeOverdue}`);
+        
+        if (shouldBeOverdue && device.status !== 'overdue') {
+          console.log(`[OVERDUE CHECK] ✓ FLAGGING AS OVERDUE`);
+          await prisma.device.update({
+            where: { id: device.id },
+            data: { status: 'overdue' },
+          });
+        } else if (shouldBeOverdue) {
+          console.log(`[OVERDUE CHECK] Already marked as overdue`);
+        } else {
+          console.log(`[OVERDUE CHECK] Not overdue yet - within ${OVERDUE_BUFFER_MINUTES} minute buffer`);
+        }
+      } else {
+        // No sessions have ended yet today
+        console.log(`[OVERDUE CHECK] No sessions have ended yet today - not overdue`);
+      }
     }
   }
   
