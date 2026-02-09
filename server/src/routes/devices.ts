@@ -208,15 +208,32 @@ router.post('/:id/pickup', async (req, res) => {
       },
     });
 
-    // Create history entry
-    await prisma.deviceHistory.create({
-      data: {
+    // Check for recent duplicate history entry (within last 5 seconds)
+    const fiveSecondsAgo = new Date(Date.now() - 5000);
+    const recentHistory = await prisma.deviceHistory.findFirst({
+      where: {
         deviceId: id,
         userId,
-        userName,
         action: 'pickup',
+        timestamp: {
+          gte: fiveSecondsAgo,
+        },
       },
     });
+
+    // Only create history entry if no recent duplicate exists
+    if (!recentHistory) {
+      await prisma.deviceHistory.create({
+        data: {
+          deviceId: id,
+          userId,
+          userName,
+          action: 'pickup',
+        },
+      });
+    } else {
+      console.log('Skipping duplicate pickup history entry for device:', id);
+    }
 
     res.json(device);
   } catch (error) {
@@ -245,15 +262,32 @@ router.post('/:id/return', async (req, res) => {
       },
     });
 
-    // Create history entry
-    await prisma.deviceHistory.create({
-      data: {
+    // Check for recent duplicate history entry (within last 5 seconds)
+    const fiveSecondsAgo = new Date(Date.now() - 5000);
+    const recentHistory = await prisma.deviceHistory.findFirst({
+      where: {
         deviceId: id,
         userId,
-        userName,
         action: 'return',
+        timestamp: {
+          gte: fiveSecondsAgo,
+        },
       },
     });
+
+    // Only create history entry if no recent duplicate exists
+    if (!recentHistory) {
+      await prisma.deviceHistory.create({
+        data: {
+          deviceId: id,
+          userId,
+          userName,
+          action: 'return',
+        },
+      });
+    } else {
+      console.log('Skipping duplicate return history entry for device:', id);
+    }
 
     res.json(device);
   } catch (error) {
