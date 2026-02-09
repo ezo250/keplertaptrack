@@ -70,21 +70,14 @@ async function checkAndUpdateOverdueDevices() {
       continue;
     }
     
-    // NEW LOGIC: Check EACH session independently
-    // For every session that has ended, check if 5 minutes have passed
-    // If yes, and device not returned, flag as overdue
-    let shouldBeOverdue = false;
+    // FIXED LOGIC: Only flag as overdue after the LAST session ends
+    // Find the last session's end time
+    const lastSession = todaySchedule[todaySchedule.length - 1]; // Already sorted by startTime
+    const lastSessionEndMinutes = timeToMinutes(lastSession.endTime);
+    const minutesSinceLastSessionEnd = currentMinutes - lastSessionEndMinutes;
     
-    for (const session of todaySchedule) {
-      const sessionEndMinutes = timeToMinutes(session.endTime);
-      const minutesSinceSessionEnd = currentMinutes - sessionEndMinutes;
-      
-      // If ANY session has ended and more than 5 minutes have passed
-      if (minutesSinceSessionEnd > OVERDUE_BUFFER_MINUTES) {
-        shouldBeOverdue = true;
-        break; // No need to check further, already overdue
-      }
-    }
+    // Device is overdue only if the LAST session has ended and buffer time has passed
+    const shouldBeOverdue = minutesSinceLastSessionEnd > OVERDUE_BUFFER_MINUTES;
     
     // Update device status if it should be overdue
     if (shouldBeOverdue && device.status !== 'overdue') {
