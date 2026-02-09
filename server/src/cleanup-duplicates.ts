@@ -28,26 +28,26 @@ async function cleanupDuplicateHistory() {
     let duplicatesDeleted = 0;
     const idsToDelete: string[] = [];
 
-    // Check each group for duplicates (within 10 seconds of each other)
+    // Check each group for duplicates (within 30 seconds of each other)
     for (const [key, entries] of groups.entries()) {
       if (entries.length > 1) {
         // Sort by timestamp
         entries.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-        // Check for duplicates within 10 seconds
+        // Check for duplicates within 30 seconds
         for (let i = 1; i < entries.length; i++) {
           const prevTime = new Date(entries[i - 1].timestamp).getTime();
           const currTime = new Date(entries[i].timestamp).getTime();
           const timeDiff = currTime - prevTime;
 
-          // If entries are within 10 seconds, consider them duplicates
-          if (timeDiff < 10000) {
+          // If entries are within 30 seconds, consider them duplicates
+          if (timeDiff < 30000) {
             duplicatesFound++;
             idsToDelete.push(entries[i].id);
             console.log(`❌ Duplicate found: ${key}`);
             console.log(`   - Keeping: ${entries[i - 1].id} (${entries[i - 1].timestamp})`);
             console.log(`   - Deleting: ${entries[i].id} (${entries[i].timestamp})`);
-            console.log(`   - Time diff: ${timeDiff}ms\n`);
+            console.log(`   - Time diff: ${timeDiff}ms (${(timeDiff / 1000).toFixed(1)}s)\n`);
           }
         }
       }

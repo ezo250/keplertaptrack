@@ -208,15 +208,15 @@ router.post('/:id/pickup', async (req, res) => {
       },
     });
 
-    // Check for recent duplicate history entry (within last 5 seconds)
-    const fiveSecondsAgo = new Date(Date.now() - 5000);
+    // Check for recent duplicate history entry (within last 30 seconds)
+    const thirtySecondsAgo = new Date(Date.now() - 30000);
     const recentHistory = await prisma.deviceHistory.findFirst({
       where: {
         deviceId: id,
         userId,
         action: 'pickup',
         timestamp: {
-          gte: fiveSecondsAgo,
+          gte: thirtySecondsAgo,
         },
       },
     });
@@ -231,8 +231,9 @@ router.post('/:id/pickup', async (req, res) => {
           action: 'pickup',
         },
       });
+      console.log('Created pickup history entry for device:', id, 'user:', userName);
     } else {
-      console.log('Skipping duplicate pickup history entry for device:', id);
+      console.log('Skipping duplicate pickup history entry for device:', id, 'user:', userName, 'within 30 seconds');
     }
 
     res.json(device);
@@ -262,15 +263,15 @@ router.post('/:id/return', async (req, res) => {
       },
     });
 
-    // Check for recent duplicate history entry (within last 5 seconds)
-    const fiveSecondsAgo = new Date(Date.now() - 5000);
+    // Check for recent duplicate history entry (within last 30 seconds)
+    const thirtySecondsAgo = new Date(Date.now() - 30000);
     const recentHistory = await prisma.deviceHistory.findFirst({
       where: {
         deviceId: id,
         userId,
         action: 'return',
         timestamp: {
-          gte: fiveSecondsAgo,
+          gte: thirtySecondsAgo,
         },
       },
     });
@@ -285,8 +286,9 @@ router.post('/:id/return', async (req, res) => {
           action: 'return',
         },
       });
+      console.log('Created return history entry for device:', id, 'user:', userName);
     } else {
-      console.log('Skipping duplicate return history entry for device:', id);
+      console.log('Skipping duplicate return history entry for device:', id, 'user:', userName, 'within 30 seconds');
     }
 
     res.json(device);

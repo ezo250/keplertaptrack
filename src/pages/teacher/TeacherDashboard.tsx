@@ -139,18 +139,33 @@ export default function TeacherDashboard() {
     // Clear selected device immediately
     setSelectedDevice(null);
 
-    const completeAction = () => {
+    let actionCompleted = false; // Track if action has been executed
+
+    const completeAction = async () => {
+      if (actionCompleted) {
+        console.log('[TeacherDashboard] Action already completed, skipping duplicate');
+        return;
+      }
+      actionCompleted = true;
+      
       console.log('[TeacherDashboard] Authorization accepted, proceeding with action');
-      if (mode === 'pickup') {
-        pickupDevice(deviceDbId, user.id, user.name);
-        setLastActionDevice(deviceId);
+      try {
+        if (mode === 'pickup') {
+          await pickupDevice(deviceDbId, user.id, user.name);
+          setLastActionDevice(deviceId);
+          setIsVerifyingQR(false);
+          setShowPickupSuccess(true);
+        } else {
+          await returnDevice(deviceDbId, user.id, user.name);
+          setLastActionDevice(deviceId);
+          setIsVerifyingQR(false);
+          setShowReturnSuccess(true);
+        }
+      } catch (err) {
+        console.error('[TeacherDashboard] Error completing action:', err);
         setIsVerifyingQR(false);
-        setShowPickupSuccess(true);
-      } else {
-        returnDevice(deviceDbId, user.id, user.name);
-        setLastActionDevice(deviceId);
-        setIsVerifyingQR(false);
-        setShowReturnSuccess(true);
+        setQrError('Failed to complete action. Please try again.');
+        actionCompleted = false; // Reset on error
       }
     };
 
@@ -177,7 +192,7 @@ export default function TeacherDashboard() {
         // Fallback: if server code unavailable or mismatch, accept well-formed codes for the mode
         if (isCodeValidForMode(scannedCode, mode)) {
           console.warn('[TeacherDashboard] Falling back to client-side validation');
-          completeAction();
+          await completeAction();
           return;
         }
 
@@ -198,14 +213,14 @@ export default function TeacherDashboard() {
       }
 
       console.log('[TeacherDashboard] QR code verified successfully, proceeding with action');
-      completeAction();
+      await completeAction();
     } catch (error: any) {
       console.error('[TeacherDashboard] QR verification error:', error);
 
       // Fallback path on API failure: accept well-formed QR codes per mode
       if (isCodeValidForMode(scannedCode, mode)) {
         console.warn('[TeacherDashboard] API failure - using client-side validation');
-        completeAction();
+        await completeAction();
         return;
       }
 
