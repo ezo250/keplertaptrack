@@ -69,21 +69,21 @@ async function checkAndUpdateOverdueDevices() {
     console.log(`[OVERDUE CHECK] Teacher has ${todaySchedule.length} sessions today (${currentDay})`);
     
     if (todaySchedule.length === 0) {
-      // No schedule today, use simple time-based check (10.5 hours)
+      // No schedule today - teacher shouldn't have device, use short fallback (1 hour)
       const timeSincePickup = now.getTime() - new Date(device.pickedUpAt).getTime();
-      const FALLBACK_THRESHOLD_MS = (10 * 60 + 30) * 60 * 1000;
+      const FALLBACK_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
       const hoursSincePickup = (timeSincePickup / (60 * 60 * 1000)).toFixed(2);
       
-      console.log(`[OVERDUE CHECK] No schedule - using fallback (10.5 hours). Time since pickup: ${hoursSincePickup} hours`);
+      console.log(`[OVERDUE CHECK] No schedule today - using 1-hour fallback. Time since pickup: ${hoursSincePickup} hours`);
       
       if (timeSincePickup > FALLBACK_THRESHOLD_MS && device.status !== 'overdue') {
-        console.log(`[OVERDUE CHECK] ✓ FLAGGING AS OVERDUE (fallback threshold exceeded)`);
+        console.log(`[OVERDUE CHECK] ✓ FLAGGING AS OVERDUE (no classes today, exceeded 1-hour limit)`);
         await prisma.device.update({
           where: { id: device.id },
           data: { status: 'overdue' },
         });
       } else {
-        console.log(`[OVERDUE CHECK] Not overdue yet (fallback)`);
+        console.log(`[OVERDUE CHECK] Not overdue yet (within 1-hour fallback)`);
       }
       continue;
     }
