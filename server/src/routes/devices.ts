@@ -257,33 +257,53 @@ router.post('/:id/pickup', async (req, res) => {
       expectedReturn = new Date(now.getTime() + (10 * 60 + 30) * 60 * 1000);
     }
 
-    const device = await prisma.device.update({
-      where: { id },
-      data: {
-        status: 'in_use',
-        currentUserId: userId,
-        currentUserName: userName,
-        pickedUpAt: now,
-        expectedReturnAt: expectedReturn,
-      },
-    });
-
-    // Check for recent duplicate history entry (within last 30 seconds)
-    const thirtySecondsAgo = new Date(Date.now() - 30000);
-    const recentHistory = await prisma.deviceHistory.findFirst({
-      where: {
-        deviceId: id,
-        userId,
-        action: 'pickup',
-        timestamp: {
-          gte: thirtySecondsAgo,
+    // Use a transaction to ensure atomic operation and prevent race conditions
+    const result = await prisma.$transaction(async (tx) => {
+      // Check for recent duplicate history entry (within last 2 minutes) using transaction
+      const twoMinutesAgo = new Date(Date.now() - 120000);
+      const recentHistory = await tx.deviceHistory.findFirst({
+        where: {
+          deviceId: id,
+          userId,
+          action: 'pickup',
+          timestamp: {
+            gte: twoMinutesAgo,
+          },
         },
-      },
-    });
+      });
 
-    // Only create history entry if no recent duplicate exists
-    if (!recentHistory) {
-      await prisma.deviceHistory.create({
+      // If duplicate exists, don't create another entry but still update device status
+      if (recentHistory) {
+        console.log('Skipping duplicate pickup history entry for device:', id, 'user:', userName, 'within 2 minutes');
+        
+        // Still update device status in case it wasn't updated
+        const device = await tx.device.update({
+          where: { id },
+          data: {
+            status: 'in_use',
+            currentUserId: userId,
+            currentUserName: userName,
+            pickedUpAt: now,
+            expectedReturnAt: expectedReturn,
+          },
+        });
+        
+        return device;
+      }
+
+      // No recent duplicate - create history entry and update device
+      const device = await tx.device.update({
+        where: { id },
+        data: {
+          status: 'in_use',
+          currentUserId: userId,
+          currentUserName: userName,
+          pickedUpAt: now,
+          expectedReturnAt: expectedReturn,
+        },
+      });
+
+      await tx.deviceHistory.create({
         data: {
           deviceId: id,
           userId,
@@ -291,12 +311,13 @@ router.post('/:id/pickup', async (req, res) => {
           action: 'pickup',
         },
       });
+      
       console.log('Created pickup history entry for device:', id, 'user:', userName);
-    } else {
-      console.log('Skipping duplicate pickup history entry for device:', id, 'user:', userName, 'within 30 seconds');
-    }
+      
+      return device;
+    });
 
-    res.json(device);
+    res.json(result);
   } catch (error) {
     console.error('Pickup device error:', error);
     res.status(500).json({ error: 'Failed to pickup device' });
@@ -309,36 +330,59 @@ router.post('/:id/return', async (req, res) => {
     const { id } = req.params;
     const { userId, userName } = req.body;
 
-    const device = await prisma.device.update({
-      where: { id },
-      data: {
-        status: 'available',
-        currentUserId: null,
-        currentUserName: null,
-        pickedUpAt: null,
-        expectedReturnAt: null,
-        lastReturnedAt: new Date(),
-        lastUserId: userId,
-        lastUserName: userName,
-      },
-    });
-
-    // Check for recent duplicate history entry (within last 30 seconds)
-    const thirtySecondsAgo = new Date(Date.now() - 30000);
-    const recentHistory = await prisma.deviceHistory.findFirst({
-      where: {
-        deviceId: id,
-        userId,
-        action: 'return',
-        timestamp: {
-          gte: thirtySecondsAgo,
+    // Use a transaction to ensure atomic operation and prevent race conditions
+    const result = await prisma.$transaction(async (tx) => {
+      // Check for recent duplicate history entry (within last 2 minutes) using transaction
+      const twoMinutesAgo = new Date(Date.now() - 120000);
+      const recentHistory = await tx.deviceHistory.findFirst({
+        where: {
+          deviceId: id,
+          userId,
+          action: 'return',
+          timestamp: {
+            gte: twoMinutesAgo,
+          },
         },
-      },
-    });
+      });
 
-    // Only create history entry if no recent duplicate exists
-    if (!recentHistory) {
-      await prisma.deviceHistory.create({
+      // If duplicate exists, don't create another entry but still update device status
+      if (recentHistory) {
+        console.log('Skipping duplicate return history entry for device:', id, 'user:', userName, 'within 2 minutes');
+        
+        // Still update device status in case it wasn't updated
+        const device = await tx.device.update({
+          where: { id },
+          data: {
+            status: 'available',
+            currentUserId: null,
+            currentUserName: null,
+            pickedUpAt: null,
+            expectedReturnAt: null,
+            lastReturnedAt: new Date(),
+            lastUserId: userId,
+            lastUserName: userName,
+          },
+        });
+        
+        return device;
+      }
+
+      // No recent duplicate - create history entry and update device
+      const device = await tx.device.update({
+        where: { id },
+        data: {
+          status: 'available',
+          currentUserId: null,
+          currentUserName: null,
+          pickedUpAt: null,
+          expectedReturnAt: null,
+          lastReturnedAt: new Date(),
+          lastUserId: userId,
+          lastUserName: userName,
+        },
+      });
+
+      await tx.deviceHistory.create({
         data: {
           deviceId: id,
           userId,
@@ -346,12 +390,13 @@ router.post('/:id/return', async (req, res) => {
           action: 'return',
         },
       });
+      
       console.log('Created return history entry for device:', id, 'user:', userName);
-    } else {
-      console.log('Skipping duplicate return history entry for device:', id, 'user:', userName, 'within 30 seconds');
-    }
+      
+      return device;
+    });
 
-    res.json(device);
+    res.json(result);
   } catch (error) {
     console.error('Return device error:', error);
     res.status(500).json({ error: 'Failed to return device' });

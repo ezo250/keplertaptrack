@@ -28,26 +28,26 @@ async function cleanupDuplicateHistory() {
     let duplicatesDeleted = 0;
     const idsToDelete: string[] = [];
 
-    // Check each group for duplicates (within 30 seconds of each other)
+    // Check each group for duplicates (within 2 minutes of each other)
     for (const [key, entries] of groups.entries()) {
       if (entries.length > 1) {
         // Sort by timestamp
         entries.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-        // Check for duplicates within 30 seconds
+        // Check for duplicates within 2 minutes
         for (let i = 1; i < entries.length; i++) {
           const prevTime = new Date(entries[i - 1].timestamp).getTime();
           const currTime = new Date(entries[i].timestamp).getTime();
           const timeDiff = currTime - prevTime;
 
-          // If entries are within 30 seconds, consider them duplicates
-          if (timeDiff < 30000) {
+          // If entries are within 2 minutes, consider them duplicates
+          if (timeDiff < 120000) {
             duplicatesFound++;
             idsToDelete.push(entries[i].id);
-            console.log(`❌ Duplicate found: ${key}`);
-            console.log(`   - Keeping: ${entries[i - 1].id} (${entries[i - 1].timestamp})`);
-            console.log(`   - Deleting: ${entries[i].id} (${entries[i].timestamp})`);
-            console.log(`   - Time diff: ${timeDiff}ms (${(timeDiff / 1000).toFixed(1)}s)\n`);
+            console.log(`❌ Duplicate found: ${entries[i - 1].userName} - ${key.split('-').pop()}`);
+            console.log(`   - Keeping: ${new Date(entries[i - 1].timestamp).toLocaleString()}`);
+            console.log(`   - Deleting: ${new Date(entries[i].timestamp).toLocaleString()}`);
+            console.log(`   - Time diff: ${(timeDiff / 1000).toFixed(1)}s\n`);
           }
         }
       }

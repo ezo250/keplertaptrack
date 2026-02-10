@@ -78,8 +78,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     mutationFn: ({ id, userId, userName }: { id: string; userId: string; userName: string }) =>
       devicesAPI.pickup(id, userId, userName),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['devices'] });
-      queryClient.invalidateQueries({ queryKey: ['deviceHistory'] });
+      // Use a slight delay to ensure the backend has completed all operations
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['devices'] });
+        queryClient.invalidateQueries({ queryKey: ['deviceHistory'] });
+      }, 100);
     },
   });
 
@@ -87,8 +90,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     mutationFn: ({ id, userId, userName }: { id: string; userId: string; userName: string }) =>
       devicesAPI.return(id, userId, userName),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['devices'] });
-      queryClient.invalidateQueries({ queryKey: ['deviceHistory'] });
+      // Use a slight delay to ensure the backend has completed all operations
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['devices'] });
+        queryClient.invalidateQueries({ queryKey: ['deviceHistory'] });
+      }, 100);
     },
   });
 
@@ -170,10 +176,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const pickupDevice = async (deviceId: string, userId: string, userName: string) => {
+    // Prevent multiple simultaneous calls
+    if (pickupDeviceMutation.isPending) {
+      console.log('Pickup already in progress, skipping duplicate call');
+      return;
+    }
     await pickupDeviceMutation.mutateAsync({ id: deviceId, userId, userName });
   };
 
   const returnDevice = async (deviceId: string, userId: string, userName: string) => {
+    // Prevent multiple simultaneous calls
+    if (returnDeviceMutation.isPending) {
+      console.log('Return already in progress, skipping duplicate call');
+      return;
+    }
     await returnDeviceMutation.mutateAsync({ id: deviceId, userId, userName });
   };
 
