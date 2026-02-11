@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 import authRoutes from './routes/auth';
-import deviceRoutes from './routes/devices';
+import deviceRoutes, { checkAndUpdateOverdueDevices } from './routes/devices';
 import teacherRoutes from './routes/teachers';
 import timetableRoutes from './routes/timetable';
 import historyRoutes from './routes/history';
@@ -97,6 +97,21 @@ app.listen(PORT, HOST, () => {
   prisma.$connect()
     .then(() => {
       console.log('✅ Database connected successfully');
+      
+      // Start periodic overdue check (every 1 minute)
+      console.log('⏰ Starting periodic overdue check (every 1 minute)...');
+      setInterval(async () => {
+        try {
+          await checkAndUpdateOverdueDevices();
+        } catch (error) {
+          console.error('❌ Error during periodic overdue check:', error);
+        }
+      }, 60 * 1000); // Run every 60 seconds
+      
+      // Run initial check immediately
+      checkAndUpdateOverdueDevices().catch((error) => {
+        console.error('❌ Error during initial overdue check:', error);
+      });
     })
     .catch((error) => {
       console.error('❌ Database connection failed:', error);

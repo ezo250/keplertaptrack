@@ -144,6 +144,11 @@ export const historyAPI = {
   getAll: async () => {
     return fetchAPI('/history');
   },
+  cleanupDuplicates: async () => {
+    return fetchAPI('/history/cleanup-duplicates', {
+      method: 'POST',
+    });
+  },
 };
 
 // Notifications API
