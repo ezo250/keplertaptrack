@@ -13,18 +13,23 @@
     "seed": "tsx src/seed.ts",
     "cleanup-duplicates": "tsx src/cleanup-duplicates.ts"
   },
-  "keywords": ["kepler", "taptrack", "device-management"],
+  "keywords": [
+    "kepler",
+    "taptrack",
+    "device-management"
+  ],
   "author": "Amani Alain",
   "license": "MIT",
   "dependencies": {
     "@prisma/client": "^5.8.0",
-    "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
-    "express": "^4.18.2",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^20.10.6",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "date-fns-tz": "^3.2.0",
+    "express": "^4.18.2",
     "prisma": "^5.8.0",
     "typescript": "^5.3.3"
   },

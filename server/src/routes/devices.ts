@@ -1,5 +1,6 @@
 import express from 'express';
 import { prisma } from '../index';
+import { toZonedTime } from 'date-fns-tz';
 
 const router = express.Router();
 
@@ -20,15 +21,19 @@ function areConsecutive(endTime1: string, startTime2: string): boolean {
 
 // Helper function to check and update overdue devices based on timetable
 async function checkAndUpdateOverdueDevices() {
-  const now = new Date();
+  const RWANDA_TIMEZONE = 'Africa/Kigali';
   const OVERDUE_BUFFER_MINUTES = 5; // 5 minutes buffer after session ends
   const NO_SCHEDULE_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour for no schedule
+  
+  // Get current time in Rwanda timezone
+  const nowUtc = new Date();
+  const now = toZonedTime(nowUtc, RWANDA_TIMEZONE);
   
   // Get current day of week
   const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const currentDay = daysOfWeek[now.getDay()];
   
-  // Get current time in minutes since midnight
+  // Get current time in minutes since midnight (in Rwanda time)
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
   const currentTimeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
   
@@ -61,6 +66,31 @@ async function checkAndUpdateOverdueDevices() {
     
     console.log(`\n[OVERDUE CHECK] Checking device ${device.deviceId} (User: ${device.currentUserName})`);
     
+    // Check if device was picked up on a different day (overnight device)
+    const pickedUpDate = toZonedTime(new Date(device.pickedUpAt), RWANDA_TIMEZONE);
+    const pickedUpDay = pickedUpDate.getDate();
+    const currentDayOfMonth = now.getDate();
+    const wasPickedUpYesterday = pickedUpDay !== currentDayOfMonth;
+    
+    console.log(`[OVERDUE CHECK] Picked up at: ${pickedUpDate.toISOString()} (Rwanda time)`);
+    console.log(`[OVERDUE CHECK] Current time: ${now.toISOString()} (Rwanda time)`);
+    console.log(`[OVERDUE CHECK] Was picked up on different day? ${wasPickedUpYesterday}`);
+    
+    // If device was picked up on a previous day and it's past midnight, it's overdue
+    if (wasPickedUpYesterday) {
+      console.log(`[OVERDUE CHECK] Device carried overnight - should have been returned yesterday`);
+      if (device.status !== 'overdue') {
+        console.log(`[OVERDUE CHECK] ✓ FLAGGING AS OVERDUE (overnight device)`);
+        await prisma.device.update({
+          where: { id: device.id },
+          data: { status: 'overdue' },
+        });
+      } else {
+        console.log(`[OVERDUE CHECK] Already marked as overdue`);
+      }
+      continue;
+    }
+    
     // Get teacher's timetable for today
     const todaySchedule = await prisma.timetableEntry.findMany({
       where: {
@@ -76,7 +106,7 @@ async function checkAndUpdateOverdueDevices() {
     
     if (todaySchedule.length === 0) {
       // No schedule today - teacher shouldn't have device, use 1-hour timeout
-      const timeSincePickup = now.getTime() - new Date(device.pickedUpAt).getTime();
+      const timeSincePickup = nowUtc.getTime() - new Date(device.pickedUpAt).getTime();
       const minutesSincePickup = Math.floor(timeSincePickup / (60 * 1000));
       
       console.log(`[OVERDUE CHECK] No schedule today - using 1-hour timeout. Minutes since pickup: ${minutesSincePickup}`);

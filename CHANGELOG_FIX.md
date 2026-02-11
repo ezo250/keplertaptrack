@@ -2,6 +2,18 @@
 
 ## Date: 2026-02-11
 
+## CRITICAL UPDATE - Timezone Fix
+
+**Issue**: Server was using UTC time while timetable uses Rwanda local time (Africa/Kigali, UTC+2), causing overdue detection to fail completely.
+
+**Fix**: 
+- Added `date-fns-tz` package for proper timezone handling
+- All overdue checks now use Rwanda timezone
+- Added overnight device detection (devices picked up on previous days)
+- Server logs now show Rwanda time for better debugging
+
+**Result**: Overdue detection now works correctly. TAP-GASABO properly flagged as overdue.
+
 ## Issues Fixed
 
 ### 1. Device Overdue Logic Fixed ✅
