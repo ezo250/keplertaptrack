@@ -28,7 +28,7 @@ import { DeviceStatus, Device } from '@/types';
 import { devicesAPI } from '@/services/api';
 
 export default function DevicesManagement() {
-  const { devices, addDevice, removeDevice, getAvailableDevices, getDevicesInUse, getOverdueDevices } = useData();
+  const { devices, addDevice, removeDevice, updateDevice, getAvailableDevices, getDevicesInUse, getOverdueDevices } = useData();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<DeviceStatus | 'all'>('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -78,13 +78,13 @@ export default function DevicesManagement() {
     }
 
     try {
-      await devicesAPI.update(editingDevice.id, editDeviceId);
+      // Use the updateDevice from DataContext which properly invalidates queries
+      await updateDevice(editingDevice.id, editDeviceId);
       toast.success('Device updated successfully');
       setEditingDevice(null);
       setEditDeviceId('');
       setIsEditDialogOpen(false);
-      // Refresh data
-      window.location.reload();
+      // Data will be automatically refreshed by React Query
     } catch (error: any) {
       toast.error(error.message || 'Failed to update device');
     }

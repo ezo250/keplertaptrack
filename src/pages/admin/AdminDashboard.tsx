@@ -7,7 +7,7 @@ import DeviceCard from '@/components/dashboard/DeviceCard';
 import QRCodeManagement from '@/components/admin/QRCodeManagement';
 import TimetableUpload from '@/components/admin/TimetableUpload';
 import DeviceStatisticsCards from '@/components/admin/DeviceStatisticsCards';
-import { Tablet, Users, CheckCircle, AlertTriangle, Clock, ArrowRight, QrCode, Upload, BarChart3, RefreshCw, Search } from 'lucide-react';
+import { Tablet, Users, CheckCircle, AlertTriangle, Clock, ArrowRight, QrCode, Upload, BarChart3, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -15,12 +15,16 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { QRCodeType as QRType } from '@/types';
+import { historyAPI } from '@/services/api';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function AdminDashboard() {
   const { devices, teachers, timetable, getAvailableDevices, getDevicesInUse, getOverdueDevices, deviceHistory, addTimetableEntry } = useData();
   const [activeTab, setActiveTab] = useState('overview');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isCleaningUp, setIsCleaningUp] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const queryClient = useQueryClient();
 
   const availableCount = getAvailableDevices().length;
   const inUseCount = getDevicesInUse().length;
@@ -76,6 +80,21 @@ export default function AdminDashboard() {
       await new Promise(resolve => setTimeout(resolve, 1000));
     } finally {
       setIsRefreshing(false);
+    }
+  };
+
+  const handleCleanupDuplicates = async () => {
+    setIsCleaningUp(true);
+    try {
+      const result = await historyAPI.cleanupDuplicates();
+      toast.success(result.message || 'Duplicates cleaned up successfully');
+      
+      // Refresh the history data
+      queryClient.invalidateQueries({ queryKey: ['deviceHistory'] });
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to cleanup duplicates');
+    } finally {
+      setIsCleaningUp(false);
     }
   };
 
@@ -231,8 +250,23 @@ export default function AdminDashboard() {
                 transition={{ delay: 0.6 }}
                 className="bg-card rounded-xl border border-border/50 p-6"
               >
-                <h2 className="text-xl font-heading font-semibold text-foreground mb-1">Recent Activity</h2>
-                <p className="text-sm text-muted-foreground mb-6">Latest device actions</p>
+                <div className="flex items-start justify-between mb-6">
+                  <div>
+                    <h2 className="text-xl font-heading font-semibold text-foreground mb-1">Recent Activity</h2>
+                    <p className="text-sm text-muted-foreground">Latest device actions</p>
+                  </div>
+                  <Button
+                    onClick={handleCleanupDuplicates}
+                    disabled={isCleaningUp}
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 text-orange-600 hover:text-orange-700 border-orange-300 hover:border-orange-400"
+                    title="Remove duplicate entries"
+                  >
+                    <Trash2 className={`w-4 h-4 ${isCleaningUp ? 'animate-pulse' : ''}`} />
+                    <span className="hidden sm:inline">Clean</span>
+                  </Button>
+                </div>
                 
                 <ScrollArea className="h-[400px] pr-4">
                   <div className="space-y-4">

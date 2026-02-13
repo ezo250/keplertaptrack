@@ -12,14 +12,19 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ArrowUp, ArrowDown, Clock, RefreshCw, ChevronUp, ChevronDown } from 'lucide-react';
+import { ArrowUp, ArrowDown, Clock, RefreshCw, ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useState, useRef } from 'react';
+import { historyAPI } from '@/services/api';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function DeviceHistory() {
   const { deviceHistory, devices } = useData();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isCleaningUp, setIsCleaningUp] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
 
   const sortedHistory = [...deviceHistory].sort(
     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
@@ -54,6 +59,25 @@ export default function DeviceHistory() {
     }
   };
 
+  const handleCleanupDuplicates = async () => {
+    if (!confirm('This will remove duplicate entries from the history. Are you sure you want to continue?')) {
+      return;
+    }
+
+    setIsCleaningUp(true);
+    try {
+      const result = await historyAPI.cleanupDuplicates();
+      toast.success(result.message || 'Duplicates cleaned up successfully');
+      
+      // Refresh the history data
+      queryClient.invalidateQueries({ queryKey: ['deviceHistory'] });
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to cleanup duplicates');
+    } finally {
+      setIsCleaningUp(false);
+    }
+  };
+
   return (
     <div className="min-h-screen">
       <Header 
@@ -66,18 +90,31 @@ export default function DeviceHistory() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex justify-between items-center"
+          className="flex justify-between items-center gap-2"
         >
-          <Button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            variant="outline"
-            size="sm"
-            className="gap-2"
-          >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Refresh History</span>
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Refresh</span>
+            </Button>
+            
+            <Button
+              onClick={handleCleanupDuplicates}
+              disabled={isCleaningUp}
+              variant="outline"
+              size="sm"
+              className="gap-2 text-orange-600 hover:text-orange-700 border-orange-300 hover:border-orange-400"
+            >
+              <Trash2 className={`w-4 h-4 ${isCleaningUp ? 'animate-pulse' : ''}`} />
+              <span className="hidden sm:inline">Clean Duplicates</span>
+            </Button>
+          </div>
           
           <div className="flex gap-2">
             <Button

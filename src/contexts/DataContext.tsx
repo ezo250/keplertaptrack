@@ -152,9 +152,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     await removeDeviceMutation.mutateAsync(id);
   };
 
+  const updateDeviceMutation = useMutation({
+    mutationFn: ({ id, deviceId }: { id: string; deviceId: string }) =>
+      devicesAPI.update(id, deviceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['devices'] });
+    },
+  });
+
   const updateDevice = async (id: string, deviceId: string) => {
-    await devicesAPI.update(id, deviceId);
-    queryClient.invalidateQueries({ queryKey: ['devices'] });
+    await updateDeviceMutation.mutateAsync({ id, deviceId });
   };
 
   const updateDeviceStatus = (id: string, status: DeviceStatus, userId?: string, userName?: string) => {
