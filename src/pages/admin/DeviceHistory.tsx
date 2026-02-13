@@ -12,7 +12,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ArrowUp, ArrowDown, Clock, RefreshCw, ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { ArrowUp, ArrowDown, Clock, RefreshCw, ChevronUp, ChevronDown, Trash2, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { useState, useRef } from 'react';
 import { historyAPI } from '@/services/api';
@@ -23,6 +33,7 @@ export default function DeviceHistory() {
   const { deviceHistory, devices } = useData();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCleaningUp, setIsCleaningUp] = useState(false);
+  const [showCleanupDialog, setShowCleanupDialog] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
@@ -60,10 +71,7 @@ export default function DeviceHistory() {
   };
 
   const handleCleanupDuplicates = async () => {
-    if (!confirm('This will remove duplicate entries from the history. Are you sure you want to continue?')) {
-      return;
-    }
-
+    setShowCleanupDialog(false);
     setIsCleaningUp(true);
     try {
       const result = await historyAPI.cleanupDuplicates();
@@ -105,7 +113,7 @@ export default function DeviceHistory() {
             </Button>
             
             <Button
-              onClick={handleCleanupDuplicates}
+              onClick={() => setShowCleanupDialog(true)}
               disabled={isCleaningUp}
               variant="outline"
               size="sm"
@@ -213,6 +221,44 @@ export default function DeviceHistory() {
           </ScrollArea>
         </motion.div>
       </div>
+
+      {/* Cleanup Confirmation Dialog */}
+      <AlertDialog open={showCleanupDialog} onOpenChange={setShowCleanupDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-3 rounded-full bg-orange-100 dark:bg-orange-900/20">
+                <AlertTriangle className="w-6 h-6 text-orange-600 dark:text-orange-500" />
+              </div>
+              <AlertDialogTitle className="text-xl">Clean Duplicate Entries</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-base leading-relaxed pt-2">
+              This action will remove duplicate history entries from the database. Duplicate entries are those that occur within 5 minutes of each other for the same device, user, and action.
+              <div className="mt-4 p-3 rounded-lg bg-muted/50 border border-border/50">
+                <p className="text-sm font-medium text-foreground mb-1">What will be removed:</p>
+                <ul className="text-sm space-y-1 list-disc list-inside text-muted-foreground">
+                  <li>Multiple pickup/return entries within 5 minutes</li>
+                  <li>Only duplicate entries will be deleted</li>
+                  <li>Original entries will be preserved</li>
+                </ul>
+              </div>
+              <p className="mt-4 text-sm font-medium text-foreground">
+                Are you sure you want to continue?
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCleanupDuplicates}
+              className="bg-orange-600 hover:bg-orange-700 focus:ring-orange-600"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Clean Duplicates
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
