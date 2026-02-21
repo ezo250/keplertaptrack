@@ -80,3 +80,13 @@ model DeviceHistory {
   device Device @relation(fields: [deviceId], references: [id])
   user   User   @relation(fields: [userId], references: [id])
 }
+
+model QRCode {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  code       String    @unique
+  type       String    // 'pickup' or 'return'
+  isActive   Boolean   @default(true)
+  validUntil DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}

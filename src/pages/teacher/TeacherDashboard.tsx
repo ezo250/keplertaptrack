@@ -206,7 +206,15 @@ export default function TeacherDashboard() {
     } catch (error: any) {
       console.error('[TeacherDashboard] Error during QR scan process:', error);
       setIsVerifyingQR(false);
-      setQrError(error.message || 'Failed to complete action. Please try again.');
+      
+      // Provide more specific error messages
+      if (error.message?.includes('already')) {
+        setQrError('This device is already ' + (mode === 'pickup' ? 'picked up' : 'returned') + '.');
+      } else if (error.message?.includes('not found')) {
+        setQrError('Device not found. Please try again.');
+      } else {
+        setQrError(error.message || 'Failed to complete action. Please try again.');
+      }
     }
   };
 

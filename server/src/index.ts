@@ -7,6 +7,7 @@ import teacherRoutes from './routes/teachers';
 import timetableRoutes from './routes/timetable';
 import historyRoutes from './routes/history';
 import notificationRoutes from './routes/notifications';
+import qrCodeRoutes from './routes/qr-codes';
 
 const app = express();
 const prisma = new PrismaClient({
@@ -52,6 +53,7 @@ app.use('/api/teachers', teacherRoutes);
 app.use('/api/timetable', timetableRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/qr-codes', qrCodeRoutes);
 
 // Health check routes
 app.get('/', (req, res) => {
