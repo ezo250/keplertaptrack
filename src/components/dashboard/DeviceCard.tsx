@@ -73,10 +73,21 @@ export default function DeviceCard({ device, onClick, showActions = false, delay
           </p>
         ) : (
           <div className="space-y-2">
-            <p className="text-sm text-foreground flex items-center gap-1.5 font-medium">
-              <User className="w-4 h-4 text-muted-foreground" />
-              {device.currentUserName}
-            </p>
+            {device.currentUserName ? (
+              <p className="text-sm text-foreground flex items-center gap-1.5 font-medium">
+                <User className="w-4 h-4 text-muted-foreground" />
+                {device.currentUserName}
+              </p>
+            ) : device.lastUserName ? (
+              <p className="text-sm text-foreground flex items-center gap-1.5 font-medium">
+                <User className="w-4 h-4 text-muted-foreground" />
+                {device.lastUserName} (Last user)
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground font-medium">
+                User information unavailable
+              </p>
+            )}
             {device.pickedUpAt && (
               <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5" />
