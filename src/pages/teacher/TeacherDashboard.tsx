@@ -36,7 +36,6 @@ import {
   Search
 } from 'lucide-react';
 import { Device } from '@/types';
-import { qrCodeAPI } from '@/services/api';
 
 export default function TeacherDashboard() {
   const { user } = useAuth();
@@ -133,65 +132,20 @@ export default function TeacherDashboard() {
     const deviceId = selectedDevice.deviceId;
     const deviceDbId = selectedDevice.id;
     const mode = qrScanMode;
-    
-    console.log('[TeacherDashboard] Processing', mode, 'for device:', deviceId);
-    
+
     // Clear selected device immediately
     setSelectedDevice(null);
 
     try {
-      // Simplified flow: validate QR code, then execute action once
-      let isValidQR = false;
-      
-      // Try to validate with server first
-      try {
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Request timeout')), 5000)
-        );
-
-        console.log('[TeacherDashboard] Fetching active QR code from API...');
-        
-        const activeQRCode = await Promise.race([
-          qrCodeAPI.getActive(mode),
-          timeoutPromise
-        ]) as any;
-        
-        console.log('[TeacherDashboard] Active QR code received:', activeQRCode);
-        
-        // Verify the scanned code matches the active QR code
-        if (activeQRCode && activeQRCode.code === scannedCode) {
-          // Check if QR code is still valid
-          if (activeQRCode.validUntil) {
-            const validUntil = new Date(activeQRCode.validUntil);
-            if (validUntil < new Date()) {
-              console.error('[TeacherDashboard] QR code expired');
-              setQrError('QR code has expired. Please contact admin for a new code.');
-              setIsVerifyingQR(false);
-              return;
-            }
-          }
-          isValidQR = true;
-        }
-      } catch (error: any) {
-        console.warn('[TeacherDashboard] Server validation failed:', error.message);
-        // Will fall back to client-side validation
-      }
-      
-      // Fallback to client-side validation if server validation failed
-      if (!isValidQR && isCodeValidForMode(scannedCode, mode)) {
-        console.warn('[TeacherDashboard] Using client-side validation');
-        isValidQR = true;
-      }
-      
-      // If validation failed, show error
-      if (!isValidQR) {
+      // Validate QR code using client-side format check
+      // QR codes follow the pattern: KEPLER_PICKUP_AUTH_* or KEPLER_RETURN_AUTH_*
+      if (!isCodeValidForMode(scannedCode, mode)) {
         setQrError('Invalid QR code. Please scan the correct QR code for ' + mode + '.');
         setIsVerifyingQR(false);
         return;
       }
-      
-      // Execute the action ONCE
-      console.log('[TeacherDashboard] QR code validated, executing action');
+
+      // Execute the action
       if (mode === 'pickup') {
         await pickupDevice(deviceDbId, user.id, user.name);
         setLastActionDevice(deviceId);
@@ -206,8 +160,7 @@ export default function TeacherDashboard() {
     } catch (error: any) {
       console.error('[TeacherDashboard] Error during QR scan process:', error);
       setIsVerifyingQR(false);
-      
-      // Provide more specific error messages
+
       if (error.message?.includes('already')) {
         setQrError('This device is already ' + (mode === 'pickup' ? 'picked up' : 'returned') + '.');
       } else if (error.message?.includes('not found')) {
