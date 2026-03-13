@@ -24,6 +24,8 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
   const detectorRef = useRef<any>(null);
   const canUseBarcodeDetectorRef = useRef<boolean>(false);
   const decodeBusyRef = useRef<boolean>(false);
+  // Use a ref to track scanned state inside closures (avoids stale closure bug)
+  const scannedRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -41,6 +43,7 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
     try {
       setError('');
       setScanned(false);
+      scannedRef.current = false;
 
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -90,7 +93,8 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
     }
 
     const loop = () => {
-      if (scanned) return;
+      // Use ref (not state) to avoid stale closure - prevents double-scan
+      if (scannedRef.current) return;
       const now = performance.now();
       // Throttle decoding attempts to every 150ms to improve mobile performance
       if (
@@ -136,7 +140,7 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
               img.onload = async () => {
                 try {
                   const result = await readerRef.current!.decodeFromImage(img as HTMLImageElement);
-                  if (result && !scanned) {
+                  if (result && !scannedRef.current) {
                     handleQRDetected(result.getText());
                     decodeBusyRef.current = false;
                     return;
@@ -156,7 +160,7 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
             detectorRef.current
               .detect(canvas)
               .then((codes: any[]) => {
-                if (scanned) return;
+                if (scannedRef.current) return;
                 const code = codes?.[0]?.rawValue;
                 if (code) {
                   handleQRDetected(code);
@@ -180,15 +184,18 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
   };
 
   const handleQRDetected = (qrData: string) => {
-    if (scanned) return;
-    
-    setScanned(true);
+    // Use ref to guard against stale closure allowing multiple detections
+    if (scannedRef.current) return;
+
+    scannedRef.current = true;  // immediately block further detections via ref
+    setScanned(true);           // update state for UI (green checkmark overlay)
     console.log('QR Detected:', qrData);
-    
+
     setTimeout(() => {
+      // Call onScan which handles all state cleanup (closes scanner, clears selectedDevice, etc.)
+      // Do NOT call onClose() here – it would race with onScan's state updates and clear qrError
       onScan(qrData);
       stopCamera();
-      onClose();
     }, 1000);
   };
 
@@ -216,6 +223,7 @@ export default function QRScanner({ isOpen, onClose, onScan, title }: QRScannerP
       }
 
       decodeBusyRef.current = false;
+      scannedRef.current = false;
       setIsScanning(false);
       setScanned(false);
     } catch (err) {

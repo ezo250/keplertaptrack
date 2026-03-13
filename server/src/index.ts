@@ -30,12 +30,22 @@ console.log(`🔧 Frontend URLs: ${process.env.FRONTEND_URLS || 'Not set'}`);
 // Bind to all interfaces for Render deployment
 const HOST = '0.0.0.0';
 
+// Allowed origins: read from env (comma-separated) with fallback to the production Vercel URL
+const ALLOWED_ORIGINS = (process.env.FRONTEND_URLS || process.env.FRONTEND_URL || 'https://keplertaptrack.vercel.app')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 // CORS middleware - MUST be FIRST
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "https://keplertaptrack.vercel.app");
+  const origin = req.headers.origin || '';
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+
+  res.header("Access-Control-Allow-Origin", allowedOrigin);
   res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Vary", "Origin");
 
   if (req.method === "OPTIONS") {
     return res.sendStatus(204);

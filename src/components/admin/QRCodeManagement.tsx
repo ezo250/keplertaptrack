@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,7 @@ import {
 import { QrCode, Download, RefreshCw, Calendar, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { QRCode as QRCodeType, QRCodeType as QRType } from '@/types';
+import { qrCodeAPI } from '@/services/api';
 
 interface QRCodeManagementProps {
   onGenerateQRCode?: (type: QRType, validUntil?: string) => Promise<void>;
@@ -36,7 +37,26 @@ export default function QRCodeManagement({ onGenerateQRCode }: QRCodeManagementP
   const qrRefPickup = useRef<HTMLDivElement>(null);
   const qrRefReturn = useRef<HTMLDivElement>(null);
 
-  // Generate a mock QR code value (in real app, this would come from backend)
+  // Load existing active QR codes from the server on mount so they survive page refresh
+  useEffect(() => {
+    const loadActiveQRCodes = async () => {
+      try {
+        const [pickup, ret] = await Promise.allSettled([
+          qrCodeAPI.getActive('pickup'),
+          qrCodeAPI.getActive('return'),
+        ]);
+        setGeneratedQRCodes({
+          pickup: pickup.status === 'fulfilled' ? pickup.value : undefined,
+          return: ret.status === 'fulfilled' ? ret.value : undefined,
+        });
+      } catch {
+        // Silently ignore – no active codes yet
+      }
+    };
+    loadActiveQRCodes();
+  }, []);
+
+  // Generate a QR code value locally (matches the server-side format)
   const generateQRCodeValue = (type: QRType) => {
     const timestamp = new Date().getTime();
     return `KEPLER_${type.toUpperCase()}_AUTH_${timestamp}`;
@@ -44,12 +64,24 @@ export default function QRCodeManagement({ onGenerateQRCode }: QRCodeManagementP
 
   const handleGenerateQRCode = async () => {
     try {
-      // Generate QR code locally (in real app, call backend API)
-      const qrCodeValue = generateQRCodeValue(qrCodeType);
-      const newQRCode: QRCodeType = {
+      let serverQRCode: QRCodeType | undefined;
+
+      // Call the backend API (via callback) to persist the QR code in the database
+      if (onGenerateQRCode) {
+        await onGenerateQRCode(qrCodeType, validUntil);
+      }
+
+      // Fetch the newly created active code from the server so the displayed QR matches the DB
+      try {
+        serverQRCode = await qrCodeAPI.getActive(qrCodeType);
+      } catch {
+        // Fall back to a locally generated code if the fetch fails
+      }
+
+      const newQRCode: QRCodeType = serverQRCode ?? {
         id: Math.random().toString(36).substr(2, 9),
         type: qrCodeType,
-        code: qrCodeValue,
+        code: generateQRCodeValue(qrCodeType),
         validFrom: new Date(),
         validUntil: validUntil ? new Date(validUntil) : undefined,
         isActive: true,
@@ -60,11 +92,6 @@ export default function QRCodeManagement({ onGenerateQRCode }: QRCodeManagementP
         ...prev,
         [qrCodeType]: newQRCode,
       }));
-
-      // Call the callback if provided
-      if (onGenerateQRCode) {
-        await onGenerateQRCode(qrCodeType, validUntil);
-      }
 
       toast.success(`${qrCodeType === 'pickup' ? 'Pickup' : 'Return'} QR code generated successfully`);
     } catch (error: any) {
@@ -106,11 +133,23 @@ export default function QRCodeManagement({ onGenerateQRCode }: QRCodeManagementP
 
   const handleUpdateQRCode = async (type: QRType) => {
     try {
-      const qrCodeValue = generateQRCodeValue(type);
-      const updatedQRCode: QRCodeType = {
+      // Re-generate via the callback (which calls qrCodeAPI.generate on the server)
+      if (onGenerateQRCode) {
+        await onGenerateQRCode(type, validUntil);
+      }
+
+      // Fetch the newly active code from the server
+      let serverQRCode: QRCodeType | undefined;
+      try {
+        serverQRCode = await qrCodeAPI.getActive(type);
+      } catch {
+        // Fall back to local generation if fetch fails
+      }
+
+      const updatedQRCode: QRCodeType = serverQRCode ?? {
         id: generatedQRCodes[type]?.id || Math.random().toString(36).substr(2, 9),
         type: type,
-        code: qrCodeValue,
+        code: generateQRCodeValue(type),
         validFrom: new Date(),
         validUntil: validUntil ? new Date(validUntil) : undefined,
         isActive: true,
@@ -122,10 +161,6 @@ export default function QRCodeManagement({ onGenerateQRCode }: QRCodeManagementP
         ...prev,
         [type]: updatedQRCode,
       }));
-
-      if (onGenerateQRCode) {
-        await onGenerateQRCode(type, validUntil);
-      }
 
       toast.success(`${type === 'pickup' ? 'Pickup' : 'Return'} QR code updated successfully`);
     } catch (error: any) {

@@ -161,12 +161,15 @@ export default function TeacherDashboard() {
       console.error('[TeacherDashboard] Error during QR scan process:', error);
       setIsVerifyingQR(false);
 
-      if (error.message?.includes('already')) {
+      const msg: string = error?.message || '';
+      if (msg === 'Failed to fetch' || msg.toLowerCase().includes('networkerror') || msg.toLowerCase().includes('network')) {
+        setQrError('Could not reach the server. Please check your internet connection and try again.');
+      } else if (msg.includes('already')) {
         setQrError('This device is already ' + (mode === 'pickup' ? 'picked up' : 'returned') + '.');
-      } else if (error.message?.includes('not found')) {
+      } else if (msg.includes('not found')) {
         setQrError('Device not found. Please try again.');
       } else {
-        setQrError(error.message || 'Failed to complete action. Please try again.');
+        setQrError(msg || 'Failed to complete action. Please try again.');
       }
     }
   };
@@ -724,9 +727,10 @@ export default function TeacherDashboard() {
       <QRScanner
         isOpen={isQRScannerOpen}
         onClose={() => {
+          // Only called when user manually closes the scanner (X button).
+          // Do NOT clear qrError here – handleQRScan manages it after a scan.
           setIsQRScannerOpen(false);
           setSelectedDevice(null);
-          setQrError('');
         }}
         onScan={handleQRScan}
         title={qrScanMode === 'pickup' ? 'Scan QR Code for Pickup' : 'Scan QR Code for Return'}

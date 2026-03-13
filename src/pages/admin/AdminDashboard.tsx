@@ -15,7 +15,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { QRCodeType as QRType } from '@/types';
-import { historyAPI } from '@/services/api';
+import { historyAPI, qrCodeAPI } from '@/services/api';
 import { useQueryClient } from '@tanstack/react-query';
 
 export default function AdminDashboard() {
@@ -41,10 +41,9 @@ export default function AdminDashboard() {
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     .slice(0, 5);
 
-  // Handle QR code generation
+  // Handle QR code generation – saves to the database via the backend API
   const handleGenerateQRCode = async (type: QRType, validUntil?: string) => {
-    // In a real app, this would call the backend API
-    console.log('Generating QR code:', type, validUntil);
+    await qrCodeAPI.generate(type, validUntil);
   };
 
   // Handle timetable upload
